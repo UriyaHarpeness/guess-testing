@@ -1,7 +1,7 @@
 import logging
 
 from guess_testing import generators
-from guess_testing.guess import guess, print_results
+from guess_testing.guess import Guesser
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -42,15 +42,28 @@ def h(a, b, c, d):
     return 0
 
 
-guess((generators.StringGenerator(0, 10), generators.IntGenerator(0, 10)), {}, f, limit=100000, timeout=10)
-print_results(f)
-guess((generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.IntGenerator(0, 10)), {}, g,
-      limit=100000, timeout=10)
-print_results(g)
-guess((generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.FloatGenerator(0, 5, 0.5)),
-      {'d': generators.GeneratorCollection((generators.FixedGenerator(0), generators.FixedGenerator(True)))}, h,
-      limit=100000, timeout=10)
-print_results(h)
+def c():
+    c()
+
+
+guesser = Guesser((generators.StringGenerator(0, 10), generators.IntGenerator(0, 10)), {}, f)
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+
+guesser = Guesser((generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.IntGenerator(0, 10)), {},
+                  g)
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+
+guesser = Guesser(
+    (generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.FloatGenerator(0, 5, 0.5)),
+    {'d': generators.GeneratorCollection((generators.FixedGenerator(0), generators.FixedGenerator(True)))}, h)
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+
+guesser = Guesser((), {}, c)
+guesser.guess(timeout=10)
+guesser.print_results()
 
 x = generators.ChoiceGenerator(
     (generators.ListGenerator(2, 9, generators.IntGenerator(1, 9, 3)),

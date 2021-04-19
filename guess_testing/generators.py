@@ -1,7 +1,8 @@
 import abc
 import random
-
-from typing import Any, Dict, Generator as GeneratorT, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict
+from typing import Generator as GeneratorT
+from typing import List, Optional, Sequence, Set, Tuple
 
 
 class Generator(abc.ABC):
