@@ -10,10 +10,10 @@ logger = logging.getLogger('guess-testing')
 
 
 class Guesser:
-    def __init__(self, positional: Iterable[Generator], keyword: Dict[str, Generator], func: Callable):
+    def __init__(self, positional: Iterable[Generator], keyword: Dict[str, Generator], funcs: Iterable[Callable]):
         self.positional = positional
         self.keyword = keyword
-        self.tracer = Tracer(func)
+        self.tracer = Tracer(funcs)
         self.cases = ()
         self.missed = {}
 
@@ -49,7 +49,7 @@ class Guesser:
                     continue
                 self.tracer.run_id = id_
                 try:
-                    self.tracer.func(*args, **kwargs)
+                    self.tracer.funcs[0](*args, **kwargs)
                 except:
                     pass
                 Guesser.reduce_dicts(missed_lines, self.tracer.runs[id_])
@@ -87,10 +87,10 @@ class Guesser:
         return cases, scope
 
     def print_results(self):
-        logger.info('All: %s.', self.tracer.scope)
+        logger.info('All: %s.', dict(self.tracer.scope))
         logger.info('Cases: %s.', self.cases)
         logger.info('Coverage: %d/%d (-%d) = %f%%.',
                     self.lines_length(self.tracer.scope) - self.lines_length(self.missed),
                     self.lines_length(self.tracer.scope), self.lines_length(self.missed),
                     100 - (self.lines_length(self.missed) / self.lines_length(self.tracer.scope)) * 100)
-        logger.info('Misses: %s.', self.missed)
+        logger.info('Misses: %s.', dict(self.missed))

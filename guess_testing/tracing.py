@@ -2,23 +2,26 @@ import dis
 import inspect
 from collections import defaultdict
 from sys import settrace
-from typing import Callable, Dict, Optional, Set, Tuple
+from typing import Callable, Dict, Iterable, Optional, Set, Tuple
 
 Lines = Dict[str, Set[int]]
 
 
 class Tracer:
-    def __init__(self, func: Callable):
-        self.func = func
-        self.scope = self.get_func_scope(func)
+    def __init__(self, funcs: Iterable[Callable]):
+        self.funcs = funcs
+        self.scope = defaultdict(set)
+        for func in funcs:
+            path, lines = self.get_func_scope(func)
+            self.scope[path].update(lines)
 
     @staticmethod
-    def get_func_scope(func: Callable) -> Lines:
+    def get_func_scope(func: Callable) -> Tuple[str, Set[int]]:
         bytecode = dis.Bytecode(func)
         lines = {bytecode.first_line}
         lines.update(instruction.starts_line for instruction in bytecode if instruction.starts_line is not None)
         path = inspect.getsourcefile(func)
-        return {path: lines}
+        return path, lines
 
     def trace(self, frame: 'frame', event: str, arg=None) -> Optional[Callable]:
         code = frame.f_code
