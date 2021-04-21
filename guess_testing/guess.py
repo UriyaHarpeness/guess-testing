@@ -4,17 +4,18 @@ import logging
 from typing import Callable, Dict, Iterable, Set, Tuple
 
 from guess_testing.generators import Generator
-from guess_testing.tracing import FlatLines, Lines, Tracer
+from guess_testing.tracing import Lines, Tracer
 
 logger = logging.getLogger('guess-testing')
 
 
 class Guesser:
-    def __init__(self, positional: Iterable[Generator], keyword: Dict[str, Generator], func: Callable,
-                 depth: int = float('inf')):
+    def __init__(self, positional: Iterable[Generator], keyword: Dict[str, Generator], func: Callable):
         self.positional = positional
         self.keyword = keyword
-        self.tracer = Tracer(func, depth)
+        self.tracer = Tracer(func)
+        self.cases = ()
+        self.missed = {}
 
     @staticmethod
     def reduce_dicts(a: Lines, b: Lines):
@@ -23,8 +24,19 @@ class Guesser:
             if not a[k]:
                 a.pop(k)
 
+    @staticmethod
+    def equalize_dicts(a: Lines, b: Lines):
+        for k in a.keys() & b.keys():
+            a[k] &= b[k]
+            if not a[k]:
+                a.pop(k)
+
+    @staticmethod
+    def lines_length(lines: Lines) -> int:
+        return sum(len(l) for l in lines.values())
+
     def guess(self, limit: int = float('inf'), timeout: int = 10):
-        missed_lines = copy.deepcopy(self.tracer.lines)
+        missed_lines = copy.deepcopy(self.tracer.scope)
         runs = 0
         start = datetime.datetime.now()
         with self.tracer:
@@ -41,10 +53,15 @@ class Guesser:
                 except:
                     pass
                 Guesser.reduce_dicts(missed_lines, self.tracer.runs[id_])
-                if not missed_lines:
-                    logger.debug(f'Hit all: %d/%f attempts, %f seconds.', runs, limit,
-                                 (datetime.datetime.now() - start).total_seconds())
-                    return
+                if len(missed_lines) == 0:
+                    break
+
+        self.cases, self.missed = self.get_best_cover()
+
+        if len(missed_lines) == 0:
+            logger.debug(f'Hit all: %d/%f attempts, %f seconds.', runs, limit,
+                         (datetime.datetime.now() - start).total_seconds())
+            return
 
         if runs == limit:
             logger.debug(f'Reached attempts limit: %d, breaking.', limit)
@@ -52,28 +69,28 @@ class Guesser:
 
         logger.debug(f'Reached seconds limit: %d, breaking.', timeout)
 
-    def get_best_cover(self) -> Tuple[Set[str], FlatLines]:
+    def get_best_cover(self) -> Tuple[Set[str], Lines]:
         cases = set()
 
-        full = copy.deepcopy(self.tracer.flat_lines)
-        subsets = {run_id: Tracer.flatten(lines) for run_id, lines in self.tracer.runs.items()}
-        while full:
+        scope = copy.deepcopy(self.tracer.scope)
+        subsets = {run_id: run_scope for run_id, run_scope in self.tracer.runs.items()}
+        while scope:
             for subset in subsets.values():
-                subset &= full
+                self.equalize_dicts(subset, scope)
             subsets = {k: v for k, v in subsets.items() if len(v) > 0}
             if not subsets:
                 break
-            most_cover = max(subsets, key=lambda sub: len(subsets[sub]))
+            most_cover = max(subsets, key=lambda x: self.lines_length(subsets[x]))
             cases.add(most_cover)
-            full ^= subsets[most_cover]
+            self.reduce_dicts(scope, subsets[most_cover])
 
-        return cases, full
+        return cases, scope
 
     def print_results(self):
-        cases, missed = self.get_best_cover()
-        logger.info('All: %s.', self.tracer.lines)
-        logger.info('Cases: %s.', cases)
-        logger.info('Cover: %d.', len(self.tracer.flat_lines - missed))
-        logger.info('Missed: %d.', len(missed))
-        logger.info('Cover %%: %f.', 100 - (len(missed) / len(self.tracer.flat_lines)) * 100)
-        logger.info('Misses: %s.', Tracer.unflatten(missed))
+        logger.info('All: %s.', self.tracer.scope)
+        logger.info('Cases: %s.', self.cases)
+        logger.info('Coverage: %d/%d (-%d) = %f%%.',
+                    self.lines_length(self.tracer.scope) - self.lines_length(self.missed),
+                    self.lines_length(self.tracer.scope), self.lines_length(self.missed),
+                    100 - (self.lines_length(self.missed) / self.lines_length(self.tracer.scope)) * 100)
+        logger.info('Misses: %s.', self.missed)
