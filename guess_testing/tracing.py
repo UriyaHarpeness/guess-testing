@@ -1,19 +1,20 @@
 import dis
 import inspect
 from collections import defaultdict
-from sys import settrace
-from typing import Callable, Dict, Iterable, Optional, Set, Tuple
+from sys import gettrace, settrace
+from typing import Callable, Dict, Optional, Sequence, Set, Tuple
 
 Lines = Dict[str, Set[int]]
 
 
 class Tracer:
-    def __init__(self, funcs: Iterable[Callable]):
+    def __init__(self, funcs: Sequence[Callable]):
         self.funcs = funcs
         self.scope = defaultdict(set)
         for func in funcs:
             path, lines = self.get_func_scope(func)
             self.scope[path].update(lines)
+        self.original_trace = None
 
     @staticmethod
     def get_func_scope(func: Callable) -> Tuple[str, Set[int]]:
@@ -24,6 +25,9 @@ class Tracer:
         return path, lines
 
     def trace(self, frame: 'frame', event: str, arg=None) -> Optional[Callable]:
+        if self.original_trace is not None:
+            self.original_trace(frame, event, arg)
+
         code = frame.f_code
         filename = code.co_filename
         if filename not in self.scope:
@@ -36,7 +40,8 @@ class Tracer:
     def __enter__(self):
         self.run_id = None
         self.runs = defaultdict(lambda: defaultdict(set))
+        self.original_trace = gettrace()
         settrace(self.trace)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        settrace(None)
+        settrace(self.original_trace)

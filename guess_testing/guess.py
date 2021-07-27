@@ -1,21 +1,25 @@
 import copy
 import datetime
 import logging
-from typing import Callable, Dict, Iterable, Set, Tuple
+from typing import Callable, Dict, Sequence, Set, Tuple
 
-from guess_testing.generators import Generator
+from guess_testing.generators import Generator, TypingGeneratorFactory
 from guess_testing.tracing import Lines, Tracer
 
 logger = logging.getLogger('guess-testing')
 
 
 class Guesser:
-    def __init__(self, positional: Iterable[Generator], keyword: Dict[str, Generator], funcs: Iterable[Callable]):
+    def __init__(self, funcs: Sequence[Callable], positional: Sequence[Generator] = (),
+                 keyword: Dict[str, Generator] = None):
+        self.tracer = Tracer(funcs)
+        if positional is () and keyword is None:
+            keyword = TypingGeneratorFactory.get_generators(funcs[0])
         self.positional = positional
         self.keyword = keyword
-        self.tracer = Tracer(funcs)
         self.cases = ()
         self.missed = {}
+        self.run_arguments = []
 
     @staticmethod
     def reduce_dicts(a: Lines, b: Lines):
@@ -35,39 +39,44 @@ class Guesser:
     def lines_length(lines: Lines) -> int:
         return sum(len(l) for l in lines.values())
 
-    def guess(self, limit: int = float('inf'), timeout: int = 10):
-        missed_lines = copy.deepcopy(self.tracer.scope)
-        runs = 0
+    def guess(self, limit: int = float('inf'), timeout: int = 10) -> 'Guesser':
         start = datetime.datetime.now()
+        self.run_arguments = []
+        run_count = 0
+        missed_lines = copy.deepcopy(self.tracer.scope)
+
+        # todo: maybe in the future enforce uniqueness of cases, but for most cases this will just not be worth it.
         with self.tracer:
-            while runs < limit and (datetime.datetime.now() - start).total_seconds() < timeout:
-                runs += 1
+            while run_count < limit and (datetime.datetime.now() - start).total_seconds() < timeout:
                 args = tuple(p() for p in self.positional)
                 kwargs = {k: v() for k, v in self.keyword.items()}
-                id_ = args + tuple(kwargs.values())
-                if id_ in self.tracer.runs:
-                    continue
-                self.tracer.run_id = id_
+                self.tracer.run_id = run_count
+                self.run_arguments.append((args, kwargs))
+
                 try:
                     self.tracer.funcs[0](*args, **kwargs)
                 except:
                     pass
-                Guesser.reduce_dicts(missed_lines, self.tracer.runs[id_])
+
+                Guesser.reduce_dicts(missed_lines, self.tracer.runs[run_count])
+                run_count += 1
                 if len(missed_lines) == 0:
                     break
 
         self.cases, self.missed = self.get_best_cover()
 
         if len(missed_lines) == 0:
-            logger.debug(f'Hit all: %d/%f attempts, %f seconds.', runs, limit,
+            logger.debug(f'Hit all: %d/%f attempts, %f seconds.', run_count, limit,
                          (datetime.datetime.now() - start).total_seconds())
-            return
+            return self
 
-        if runs == limit:
+        if run_count == limit:
             logger.debug(f'Reached attempts limit: %d, breaking.', limit)
-            return
+            return self
 
         logger.debug(f'Reached seconds limit: %d, breaking.', timeout)
+
+        return self
 
     def get_best_cover(self) -> Tuple[Set[str], Lines]:
         cases = set()
@@ -88,7 +97,7 @@ class Guesser:
 
     def print_results(self):
         logger.info('All: %s.', dict(self.tracer.scope))
-        logger.info('Cases: %s.', self.cases)
+        logger.info('Cases (%d): %s.', len(self.cases), [self.run_arguments[case] for case in self.cases])
         logger.info('Coverage: %d/%d (-%d) = %f%%.',
                     self.lines_length(self.tracer.scope) - self.lines_length(self.missed),
                     self.lines_length(self.tracer.scope), self.lines_length(self.missed),

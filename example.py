@@ -1,5 +1,7 @@
 import logging
 
+import typing
+
 from guess_testing import generators
 from guess_testing.guess import Guesser
 
@@ -46,22 +48,142 @@ def c():
     c()
 
 
-guesser = Guesser((generators.StringGenerator(0, 10), generators.IntGenerator(0, 10)), {}, f)
+class D:
+    def jj(self, a):
+        if a == 0:
+            return 0
+        return 1
+
+
+def xx():
+    pass
+
+
+class A:
+    @staticmethod
+    def abc(v):
+        return v
+
+
+from ex2 import how
+import ex2
+
+import pandas as pd
+
+from enum import Enum
+
+
+class K(str, Enum):
+    f = 'f'
+
+
+class E:
+    def __init__(self, w):
+        self.w = w
+
+    class F:
+        @staticmethod
+        def ff(a):
+            if a == 0:
+                return 0
+            return 1
+
+    class H:
+        def __init__(self, x):
+            self.x = x
+
+    class G:
+        @staticmethod
+        def gg(a):
+            if a == 0:
+                return 0
+            return 1
+
+    def l(self, k=0):
+        return 99
+
+    def ll(self, k=0):
+        return 99
+
+    def k(self, a: int):
+        A.abc(a)
+        x = self.H(a)
+        if a == 0:
+            t = 9
+        if a == 1:
+            t = 9
+
+        def go():
+            a = 2
+            b = 2
+            c = 2
+            d = 2
+            return
+
+        m = K('f')
+        a += x.x
+        self.l(k=a)
+        dd = pd.DataFrame.from_dict({})
+        p = 3
+        ex2.wee()
+        q = 0.1
+        E.F.ff(self.w
+               + a
+               + self.w \
+               )
+        return xx(), A.abc(a), self.l(), E.F.ff(a) + E.G.gg(a), xx(), A.abc(a), self.l(), how(
+            a), ex2.wee()
+
+
+from typing import List, Dict, Set
+
+
+def wot(a: bool, b: List[Dict[int, Set[str]]]):
+    print(a, b)
+
+
+def abc(a: typing.Union[str, int], b: typing.Union[str, int]):
+    if type(a) == type(b):
+        print(1)
+    else:
+        print(2)
+
+
+Guesser((abc,)).guess(10).print_results()
+exit()
+
+e = E(666)
+guesser = Guesser((wot,))
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+
+e = E(666)
+guesser = Guesser((e.k, e.l, e.ll, A.abc, E.F.ff), (generators.IntGenerator(0, 10),), {})
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+exit()
+
+d = D()
+guesser = Guesser((generators.IntGenerator(0, 10),), {}, (d.jj,))
+guesser.guess(limit=100000, timeout=10)
+guesser.print_results()
+
+guesser = Guesser((generators.StringGenerator(0, 10), generators.IntGenerator(0, 10)), {}, (f,))
 guesser.guess(limit=100000, timeout=10)
 guesser.print_results()
 
 guesser = Guesser((generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.IntGenerator(0, 10)), {},
-                  g)
+                  (g,))
 guesser.guess(limit=100000, timeout=10)
 guesser.print_results()
 
 guesser = Guesser(
     (generators.IntGenerator(0, 10), generators.IntGenerator(0, 10), generators.FloatGenerator(0, 5, 0.5)),
-    {'d': generators.GeneratorCollection((generators.FixedGenerator(0), generators.FixedGenerator(True)))}, h)
+    {'d': generators.GeneratorCollection((generators.FixedGenerator(0), generators.FixedGenerator(True)))}, (h,))
 guesser.guess(limit=100000, timeout=10)
 guesser.print_results()
 
-guesser = Guesser((), {}, c)
+guesser = Guesser((), {}, (c,))
 guesser.guess(timeout=10)
 guesser.print_results()
 
