@@ -1,11 +1,9 @@
 import abc
-
+import random
 import typing
 from dataclasses import dataclass
-from inspect import signature
-import random
-
 from functools import partial
+from inspect import signature
 from typing import Any, Callable, Dict
 from typing import Generator as GeneratorT
 from typing import List, Optional, Sequence, Set, Tuple
@@ -13,8 +11,14 @@ from typing import List, Optional, Sequence, Set, Tuple
 
 class Generator(abc.ABC):
     @abc.abstractmethod
-    def __call__(self):
+    def __call__(self) -> Any:
         pass
+
+    def __str__(self) -> str:
+        return '%s(%r)' % (self.__class__, self.__dict__)
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class IntGenerator(Generator):
@@ -92,11 +96,11 @@ class FixedGenerator(Generator):
 
 
 class GeneratorCollection(Generator):
-    def __init__(self, generators: Sequence[Generator]):
-        self.generators = generators
+    def __init__(self, sub_generators: Sequence[Generator]):
+        self.sub_generators = sub_generators
 
     def __call__(self) -> Any:
-        return random.choice(self.generators)()
+        return random.choice(self.sub_generators)()
 
 
 class SequenceGenerator(Generator):
@@ -114,14 +118,14 @@ class ListGenerator(SequenceGenerator):
         return list(super().__call__())
 
 
-class TupleGenerator(SequenceGenerator):
-    def __call__(self) -> Tuple[Any]:
-        return tuple(super().__call__())
-
-
 class SetGenerator(SequenceGenerator):
     def __call__(self) -> Set[Any]:
         return set(super().__call__())
+
+
+class TupleSequenceGenerator(SequenceGenerator):
+    def __call__(self) -> Tuple[Any]:
+        return tuple(super().__call__())
 
 
 class RangeGenerator(Generator):
@@ -161,6 +165,23 @@ class DictGenerator(Generator):
                 range(random.randint(self.min_length, self.max_length))}
 
 
+class TupleGenerator(Generator):
+    def __init__(self, sub_generators: Sequence[Generator]):
+        self.sub_generators = sub_generators
+
+    def __call__(self) -> Tuple:
+        return tuple(generator() for generator in self.sub_generators)
+
+
+class TransformGenerator(Generator):
+    def __init__(self, sub_generator: Generator, transformer: Callable[[Any], Any]):
+        self.sub_generator = sub_generator
+        self.transformer = transformer
+
+    def __call__(self) -> Any:
+        return self.transformer(self.sub_generator())
+
+
 @dataclass
 class GeneratorConfig:
     sub_generators_number: int
@@ -178,18 +199,21 @@ GENERATORS_CONFIGS = {
 
     SequenceGenerator: GeneratorConfig(1, False, False),
     ListGenerator: GeneratorConfig(1, False, False),
-    TupleGenerator: GeneratorConfig(1, False, True),
+    TupleSequenceGenerator: GeneratorConfig(1, False, True),
     SetGenerator: GeneratorConfig(1, False, False),
     OptionalGenerator: GeneratorConfig(1, False, True),
 
     DictGenerator: GeneratorConfig(2, False, False),
 
+    TupleGenerator: GeneratorConfig(-1, False, True),
     ChoiceGenerator: GeneratorConfig(-1, False, True),
     GeneratorCollection: GeneratorConfig(-1, False, True),
 
     ChooseGenerator: GeneratorConfig(-1, True, True),
 
-    FixedGenerator: GeneratorConfig(1, True, True)
+    FixedGenerator: GeneratorConfig(1, True, True),
+
+    TransformGenerator: GeneratorConfig(1, True, False)
 }
 
 
@@ -242,12 +266,12 @@ class TypingGeneratorFactory:
         list: lambda: ListGenerator(AnyGenerator()),
         dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
         set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        tuple: lambda: TupleGenerator(AnyGenerator()),
+        tuple: lambda: TupleSequenceGenerator(AnyGenerator()),
 
         typing.List: lambda: ListGenerator(AnyGenerator()),
         typing.Dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
         typing.Set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        typing.Tuple: lambda: TupleGenerator(AnyGenerator()),
+        typing.Tuple: lambda: TupleSequenceGenerator(AnyGenerator()),
         typing.Any: partial(AnyGenerator),
         typing.Optional: lambda: OptionalGenerator(AnyGenerator())
     }

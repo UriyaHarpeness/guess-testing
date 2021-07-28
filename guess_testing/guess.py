@@ -4,7 +4,9 @@ import logging
 from typing import Callable, Dict, Sequence, Set, Tuple
 
 from guess_testing.generators import Generator, TypingGeneratorFactory
-from guess_testing.tracing import Lines, Tracer
+from guess_testing.tracing import Tracer
+
+Lines = Dict[str, Set[int]]
 
 logger = logging.getLogger('guess-testing')
 
@@ -13,7 +15,9 @@ class Guesser:
     def __init__(self, funcs: Sequence[Callable], positional: Sequence[Generator] = (),
                  keyword: Dict[str, Generator] = None):
         self.tracer = Tracer(funcs)
-        if positional is () and keyword is None:
+        if keyword is None:
+            keyword = {}
+        if positional is () and keyword == {}:
             keyword = TypingGeneratorFactory.get_generators(funcs[0])
         self.positional = positional
         self.keyword = keyword
@@ -66,7 +70,7 @@ class Guesser:
         self.cases, self.missed = self.get_best_cover()
 
         if len(missed_lines) == 0:
-            logger.debug(f'Hit all: %d/%f attempts, %f seconds.', run_count, limit,
+            logger.debug(f'Hit all: %d/%.0f attempts, %f seconds.', run_count, limit,
                          (datetime.datetime.now() - start).total_seconds())
             return self
 
@@ -98,7 +102,7 @@ class Guesser:
     def print_results(self):
         logger.info('All: %s.', dict(self.tracer.scope))
         logger.info('Cases (%d): %s.', len(self.cases), [self.run_arguments[case] for case in self.cases])
-        logger.info('Coverage: %d/%d (-%d) = %f%%.',
+        logger.info('Coverage: %d/%d (-%d) = %.2f%%.',
                     self.lines_length(self.tracer.scope) - self.lines_length(self.missed),
                     self.lines_length(self.tracer.scope), self.lines_length(self.missed),
                     100 - (self.lines_length(self.missed) / self.lines_length(self.tracer.scope)) * 100)

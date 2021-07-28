@@ -2,9 +2,7 @@ import dis
 import inspect
 from collections import defaultdict
 from sys import gettrace, settrace
-from typing import Callable, Dict, Optional, Sequence, Set, Tuple
-
-Lines = Dict[str, Set[int]]
+from typing import Callable, Optional, Sequence, Set, Tuple
 
 
 class Tracer:
