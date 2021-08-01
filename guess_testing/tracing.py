@@ -13,6 +13,7 @@ class Tracer:
             path, lines = self.get_func_scope(func)
             self.scope[path].update(lines)
         self.original_trace = None
+        self.runs = None
 
     @staticmethod
     def get_func_scope(func: Callable) -> Tuple[str, Set[int]]:

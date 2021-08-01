@@ -1,4 +1,5 @@
 import abc
+import inspect
 import random
 import typing
 from dataclasses import dataclass
@@ -9,7 +10,19 @@ from typing import Generator as GeneratorT
 from typing import List, Optional, Sequence, Set, Tuple
 
 
+@dataclass
+class GeneratorConfig:
+    sub_generators_number: int
+    requires_only_generators: bool
+    immutable: bool
+
+
 class Generator(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def config(self) -> GeneratorConfig:
+        raise NotImplementedError
+
     @abc.abstractmethod
     def __call__(self) -> Any:
         pass
@@ -22,6 +35,8 @@ class Generator(abc.ABC):
 
 
 class IntGenerator(Generator):
+    config = GeneratorConfig(0, True, True)
+
     def __init__(self, start: int = -2 ** 20, stop: int = 2 ** 20, step: int = 1):
         self.start = start
         self.stop = stop
@@ -32,6 +47,8 @@ class IntGenerator(Generator):
 
 
 class FloatGenerator(Generator):
+    config = GeneratorConfig(0, True, True)
+
     def __init__(self, start: float = -2 ** 20, stop: float = 2 ** 20, step: Optional[float] = None):
         self.start = start
         self.stop = stop
@@ -44,11 +61,15 @@ class FloatGenerator(Generator):
 
 
 class BoolGenerator(Generator):
+    config = GeneratorConfig(0, True, True)
+
     def __call__(self) -> bool:
         return random.choice((True, False))
 
 
 class StringGenerator(Generator):
+    config = GeneratorConfig(0, True, True)
+
     UPPERCASE = ''.join(chr(x) for x in range(ord('A'), ord('Z') + 1))
     LOWERCASE = ''.join(chr(x) for x in range(ord('a'), ord('z') + 1))
     NUMBERS = ''.join(chr(x) for x in range(ord('0'), ord('9') + 1))
@@ -67,11 +88,15 @@ class StringGenerator(Generator):
 
 
 class BytesGenerator(StringGenerator):
+    config = GeneratorConfig(0, True, True)
+
     def __call__(self) -> bytes:
         return super().__call__().encode('utf-8')
 
 
 class ChoiceGenerator(Generator):
+    config = GeneratorConfig(-1, True, True)
+
     def __init__(self, options: Sequence[Generator]):
         self.options = options
 
@@ -80,6 +105,8 @@ class ChoiceGenerator(Generator):
 
 
 class ChooseGenerator(Generator):
+    config = GeneratorConfig(-1, False, True)
+
     def __init__(self, options: Sequence[Any]):
         self.options = options
 
@@ -88,6 +115,8 @@ class ChooseGenerator(Generator):
 
 
 class FixedGenerator(Generator):
+    config = GeneratorConfig(1, False, True)
+
     def __init__(self, value: Any):
         self.value = value
 
@@ -96,6 +125,8 @@ class FixedGenerator(Generator):
 
 
 class GeneratorCollection(Generator):
+    config = GeneratorConfig(-1, True, True)
+
     def __init__(self, sub_generators: Sequence[Generator]):
         self.sub_generators = sub_generators
 
@@ -104,6 +135,8 @@ class GeneratorCollection(Generator):
 
 
 class SequenceGenerator(Generator):
+    config = GeneratorConfig(1, True, False)
+
     def __init__(self, sub_generator: Generator, min_length: int = 0, max_length: int = 2 ** 4):
         self.sub_generator = sub_generator
         self.min_length = min_length
@@ -114,21 +147,29 @@ class SequenceGenerator(Generator):
 
 
 class ListGenerator(SequenceGenerator):
+    config = GeneratorConfig(1, True, False)
+
     def __call__(self) -> List[Any]:
         return list(super().__call__())
 
 
 class SetGenerator(SequenceGenerator):
+    config = GeneratorConfig(1, True, False)
+
     def __call__(self) -> Set[Any]:
         return set(super().__call__())
 
 
 class TupleSequenceGenerator(SequenceGenerator):
+    config = GeneratorConfig(1, True, True)
+
     def __call__(self) -> Tuple[Any]:
         return tuple(super().__call__())
 
 
 class RangeGenerator(Generator):
+    config = GeneratorConfig(0, True, True)
+
     def __init__(self, minimum: int = -2 ** 8, maximum: int = 2 ** 8, min_step: int = -2 ** 4, max_step: int = 2 ** 4):
         self.minimum = minimum
         self.maximum = maximum
@@ -144,6 +185,8 @@ class RangeGenerator(Generator):
 
 
 class OptionalGenerator(Generator):
+    config = GeneratorConfig(1, True, True)
+
     def __init__(self, sub_generator: Generator, null_chance: float = 0.5):
         self.null_chance = null_chance
         self.sub_generator = sub_generator
@@ -153,6 +196,8 @@ class OptionalGenerator(Generator):
 
 
 class DictGenerator(Generator):
+    config = GeneratorConfig(2, True, False)
+
     def __init__(self, keys_generator: Generator, values_generator: Generator, min_length: int = 0,
                  max_length: int = 2 ** 4):
         self.keys_generator = keys_generator
@@ -166,6 +211,8 @@ class DictGenerator(Generator):
 
 
 class TupleGenerator(Generator):
+    config = GeneratorConfig(-1, True, True)
+
     def __init__(self, sub_generators: Sequence[Generator]):
         self.sub_generators = sub_generators
 
@@ -174,6 +221,8 @@ class TupleGenerator(Generator):
 
 
 class TransformGenerator(Generator):
+    config = GeneratorConfig(1, False, False)
+
     def __init__(self, sub_generator: Generator, transformer: Callable[[Any], Any]):
         self.sub_generator = sub_generator
         self.transformer = transformer
@@ -182,74 +231,69 @@ class TransformGenerator(Generator):
         return self.transformer(self.sub_generator())
 
 
-@dataclass
-class GeneratorConfig:
-    sub_generators_number: int
-    is_fixed_generator: bool
-    immutable: bool
-
-
-GENERATORS_CONFIGS = {
-    IntGenerator: GeneratorConfig(0, False, True),
-    FloatGenerator: GeneratorConfig(0, False, True),
-    BoolGenerator: GeneratorConfig(0, False, True),
-    StringGenerator: GeneratorConfig(0, False, True),
-    BytesGenerator: GeneratorConfig(0, False, True),
-    RangeGenerator: GeneratorConfig(0, False, True),
-
-    SequenceGenerator: GeneratorConfig(1, False, False),
-    ListGenerator: GeneratorConfig(1, False, False),
-    TupleSequenceGenerator: GeneratorConfig(1, False, True),
-    SetGenerator: GeneratorConfig(1, False, False),
-    OptionalGenerator: GeneratorConfig(1, False, True),
-
-    DictGenerator: GeneratorConfig(2, False, False),
-
-    TupleGenerator: GeneratorConfig(-1, False, True),
-    ChoiceGenerator: GeneratorConfig(-1, False, True),
-    GeneratorCollection: GeneratorConfig(-1, False, True),
-
-    ChooseGenerator: GeneratorConfig(-1, True, True),
-
-    FixedGenerator: GeneratorConfig(1, True, True),
-
-    TransformGenerator: GeneratorConfig(1, True, False)
-}
+GENERATORS = [
+    StringGenerator,
+    BytesGenerator,
+    RangeGenerator,
+    SequenceGenerator,
+    ListGenerator,
+    TupleSequenceGenerator,
+    SetGenerator,
+    OptionalGenerator,
+    DictGenerator,
+    TupleGenerator,
+    ChoiceGenerator,
+    GeneratorCollection,
+    ChooseGenerator,
+    FixedGenerator,
+    TransformGenerator
+]
 
 
 class AnyGenerator(Generator):
-    def __init__(self, max_depth: int = 5, require_hashable: bool = False):
-        self.sub_generator = self.generate_generator(max_depth, require_hashable)
+    config = GeneratorConfig(-1, True, True)
+
+    def __init__(self, sub_generators: Sequence[Generator] = None, max_depth: int = 5, require_hashable: bool = False):
+        self.sub_generator = self.generate_generator(sub_generators, max_depth, require_hashable)
 
     @staticmethod
-    def generate_generator(max_depth: int = 5, require_hashable: bool = False) -> Generator:
-        generator_options = [(generator, config) for generator, config in GENERATORS_CONFIGS.items() if
-                             not config.is_fixed_generator]
+    def generate_generator(given_generator_options: List[Generator] = None, max_depth: int = 5,
+                           require_hashable: bool = False) -> Generator:
+        generator_options = given_generator_options or GENERATORS
+        generator_options = [generator for generator in generator_options if
+                             generator.config.requires_only_generators and (
+                                     not generator == AnyGenerator and not isinstance(generator, AnyGenerator))]
 
         if require_hashable:
-            generator_options = [(generator, config) for generator, config in generator_options if config.immutable]
+            generator_options = [generator for generator in generator_options if generator.config.immutable]
 
         if max_depth <= 1:
-            generator_options = [(generator, config) for generator, config in generator_options if
-                                 not config.is_fixed_generator and config.sub_generators_number == 0]
+            generator_options = [generator for generator in generator_options if
+                                 generator.config.sub_generators_number == 0]
 
-        chosen_generator, chosen_generator_config = random.choice(generator_options)
+        chosen_generator = random.choice(generator_options)
 
         if chosen_generator == SetGenerator:
-            return chosen_generator(AnyGenerator.generate_generator(max_depth - 1, True))
+            return chosen_generator(AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True))
         if chosen_generator == DictGenerator:
-            return chosen_generator(AnyGenerator.generate_generator(max_depth - 1, True),
-                                    AnyGenerator.generate_generator(max_depth - 1, require_hashable))
+            return chosen_generator(AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True),
+                                    AnyGenerator.generate_generator(given_generator_options, max_depth - 1,
+                                                                    require_hashable))
 
-        if chosen_generator_config.sub_generators_number == -1:
-            return chosen_generator([AnyGenerator.generate_generator(max_depth - 1, require_hashable) for _ in
-                                     range(random.randint(1, 10))])
+        if chosen_generator.config.sub_generators_number == -1:
+            return chosen_generator(
+                [AnyGenerator.generate_generator(given_generator_options, max_depth - 1, require_hashable) for _ in
+                 range(random.randint(1, 10))])
 
-        return chosen_generator(*[AnyGenerator.generate_generator(max_depth - 1, require_hashable) for _ in
-                                  range(chosen_generator_config.sub_generators_number)])
+        return chosen_generator(
+            *[AnyGenerator.generate_generator(given_generator_options, max_depth - 1, require_hashable) for _ in
+              range(chosen_generator.config.sub_generators_number)])
 
     def __call__(self) -> Any:
         return self.sub_generator()
+
+
+GENERATORS.append(AnyGenerator)
 
 
 class TypingGeneratorFactory:
@@ -288,6 +332,9 @@ class TypingGeneratorFactory:
 
     @staticmethod
     def get_generator(annotation: type) -> Generator:
+        if annotation is inspect._empty:
+            raise TypeError('Type not specified')
+
         # todo: maybe support more typing types.
         if annotation in TypingGeneratorFactory.MAPPING:
             return TypingGeneratorFactory.MAPPING[annotation]()
@@ -301,7 +348,7 @@ class TypingGeneratorFactory:
                 args_generators = [TypingGeneratorFactory.get_generator(arg) for arg in args]
                 matching_generator = TypingGeneratorFactory.TYPING_TRANSLATION[origin]
                 return matching_generator(args_generators) if \
-                    GENERATORS_CONFIGS[matching_generator].sub_generators_number == -1 else \
+                    matching_generator.config.sub_generators_number == -1 else \
                     matching_generator(*args_generators)
 
         raise ValueError(f'Could not interpret type "{annotation}".')

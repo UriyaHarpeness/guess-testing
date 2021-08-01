@@ -1,9 +1,8 @@
 import logging
-
 import typing
 
 from guess_testing import generators
-from guess_testing.guess import Guesser
+from guess_testing.guess import Guesser, StopConditions
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -65,12 +64,12 @@ class A:
         return v
 
 
-from ex2 import how
-import ex2
+from enum import Enum
 
 import pandas as pd
 
-from enum import Enum
+import ex2
+from ex2 import how
 
 
 class K(str, Enum):
@@ -135,7 +134,7 @@ class E:
             a), ex2.wee()
 
 
-from typing import List, Dict, Set
+from typing import Dict, List, Set
 
 
 def wot(a: bool, b: List[Dict[int, Set[str]]]):
@@ -149,8 +148,33 @@ def abc(a: typing.Union[str, int], b: typing.Union[str, int]):
         print(2)
 
 
-Guesser((abc,)).guess(10).print_results()
+def a(a: typing.Tuple[int, float, str], g: object):
+    c = a / g
+    return (type(a), a)
+
+
+for _ in range(100):
+    generators.AnyGenerator()
+
+gg = Guesser((a,), positional=(generators.IntGenerator(0, 10), generators.ChoiceGenerator(
+    [generators.IntGenerator(0, 10), generators.StringGenerator()])))
+print(gg.coverage)
+print(gg.exceptions)
+print(gg.return_values)
+
+gg.guess(suppress_exceptions=Exception, stop_conditions=StopConditions.CALL_LIMIT, call_limit=100)
+print(gg.coverage)
+print(gg.exceptions)
+print(gg.return_values)
 exit()
+
+print(Guesser((a,)).guess(suppress_exceptions=TypeError, stop_conditions=StopConditions.EXCEPTION_RAISED).coverage)
+Guesser((a,)).guess(suppress_exceptions=TypeError, stop_conditions=StopConditions.FULL_COVERAGE).print_results()
+exit()
+
+Guesser((abc,)).guess(10).print_results()
+Guesser((abc,)).guess().print_results()
+# exit()
 
 e = E(666)
 guesser = Guesser((wot,))
