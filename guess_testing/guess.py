@@ -1,6 +1,5 @@
-import copy
-
 import contextlib
+import copy
 import datetime
 import logging
 from collections import defaultdict
@@ -154,7 +153,7 @@ class Guesser:
         missed_lines = copy.deepcopy(self.tracer.scope)
 
         if pretty:
-            from rich.progress import Progress, BarColumn, TimeElapsedColumn
+            from rich.progress import BarColumn, Progress, TimeElapsedColumn
 
         # todo: maybe in the future enforce uniqueness of cases, but for most cases this will just not be worth it.
         with self.tracer, (Progress('[bold green]Guessing...[/bold green] [green]{task.description}', BarColumn(),
