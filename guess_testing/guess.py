@@ -28,7 +28,7 @@ class Guesser:
     A class for guessing parameters for a function until a criteria is met.
 
     Can be used for the following cases:
-    1.  Finding the set of parameters for getting a full coverage of a scope.
+    1.  Finding the smallest set of parameters for getting a full coverage of a scope.
     2.  Finding the possible exceptions the code can throw and from where, and which arguments cause these behaviors.
     3.  Finding all the possible return values of a function, and which arguments cause them.
     4.  Any form of stress testing, analysing an unknown code, and many, many more cases.
@@ -36,7 +36,7 @@ class Guesser:
 
     logger = logging.getLogger('guess-testing')
 
-    def __init__(self, funcs: Sequence[Callable], positional: Sequence[Generator] = (),
+    def __init__(self, funcs: Union[Sequence[Callable], Callable], positional: Sequence[Generator] = (),
                  keyword: Dict[str, Generator] = None):
         """
         Constructor.
@@ -50,7 +50,7 @@ class Guesser:
         if keyword is None:
             keyword = {}
         if positional == () and keyword == {}:
-            keyword = TypingGeneratorFactory.get_generators(funcs[0])
+            keyword = TypingGeneratorFactory.get_generators(self.tracer.funcs[0])
         self.positional = positional
         self.keyword = keyword
         self.run_arguments = []
@@ -80,7 +80,10 @@ class Guesser:
             a: The lines to equalize.
             b: The lines to equalize by.
         """
-        for k in a.keys() & b.keys():
+        for k in set(a.keys()):
+            if k not in b:
+                a.pop(k)
+                continue
             a[k] &= b[k]
             if not a[k]:
                 a.pop(k)
@@ -134,7 +137,7 @@ class Guesser:
               stop_conditions: int = StopConditions.FULL_COVERAGE | StopConditions.TIMEOUT | StopConditions.CALL_LIMIT,
               call_limit: int = float('inf'), timeout: int = 10,
               suppress_exceptions: Union[Sequence[Type[Exception]], Type[Exception]] = (),
-              pretty: bool = True) -> 'Guesser':
+              pretty: bool = False) -> 'Guesser':
         """
         Guess arguments and call the entry function until any of the stop conditions is met.
 
@@ -164,9 +167,11 @@ class Guesser:
                 coverage = progress.add_task(str(call_count).ljust(8, ' '), total=prev_missed_lines_count)
             start = datetime.datetime.now()
 
+            # Check stop conditions.
             while not self.check_stop_conditions(stop_conditions, call_count, call_limit,
                                                  (datetime.datetime.now() - start).total_seconds(), timeout,
                                                  missed_lines):
+                # Prepare arguments.
                 args = tuple(p() for p in self.positional)
                 kwargs = {k: v() for k, v in self.keyword.items()}
                 self.tracer.run_id = call_count
@@ -179,6 +184,7 @@ class Guesser:
 
                 self.tracer.runs[call_count] = (self.tracer.runs[call_count], result)
 
+                # Update coverage.
                 Guesser.reduce_lines(missed_lines, self.tracer.runs[call_count][0])
                 call_count += 1
 

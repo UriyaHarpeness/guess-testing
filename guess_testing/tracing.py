@@ -2,7 +2,7 @@ import dis
 import inspect
 from collections import defaultdict
 from sys import gettrace, settrace
-from typing import Callable, Optional, Sequence, Set, Tuple
+from typing import Callable, Optional, Sequence, Set, Tuple, Union
 
 
 class Tracer:
@@ -10,16 +10,16 @@ class Tracer:
     A class for tracing execution of a specific scope.
     """
 
-    def __init__(self, funcs: Sequence[Callable]):
+    def __init__(self, funcs: Union[Sequence[Callable], Callable]):
         """
         Constructor.
 
         Args:
             funcs: The scope to trace.
         """
-        self.funcs = funcs
+        self.funcs = (funcs,) if callable(funcs) else funcs
         self.scope = defaultdict(set)
-        for func in funcs:
+        for func in self.funcs:
             path, lines = self.get_func_scope(func)
             self.scope[path].update(lines)
         self.original_trace = None
