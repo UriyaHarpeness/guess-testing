@@ -1,0 +1,56 @@
+name: Stage Tests
+
+on: [ push ]
+
+jobs:
+  local-tests:
+    name: Test Code
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Guess Testing
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Set up Python 3.6
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+
+          pip install -r requirements-dev.txt
+
+      - name: Inspect Code Quality
+        run: |
+          echo Imports sorting:
+            isort \
+              --multi-line HANGING_INDENT \
+              --line-length=120 \
+              --diff \
+              guess_testing \
+            | tee isort.txt
+
+          if [ -s isort.txt ]; then
+            exit 1
+          fi
+
+          echo Linter warnings:
+          pylint \
+            --disable=C0114,C0415,R0903,R0913,R0914,W0212,W0511 \
+            --argument-rgx=^[a-z][a-z_0-9]*$ \
+            --variable-rgx=^[a-z][a-z_0-9]*$ \
+            --max-line-length=120 \
+            --ignore=_version.py \
+            guess_testing
+
+      - name: Inspect Vulnerabilities
+        run: |
+          echo Vulnerabilities:
+          # B101,B404,B603 due to versioneer
+          bandit \
+            --skip B101,B311,B404,B603 \
+            --recursive guess_testing
