@@ -1,0 +1,25 @@
+name: Publish Version
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    name: Setup, Build, Publish, and Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Guess Testing
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Publish Python Package
+        uses: mariamrf/py-package-publish-action@v1.1.0
+        with:
+          python_version: 3.6.8
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+          TWINE_REPOSITORY_URL: https://upload.pypi.org/legacy/
