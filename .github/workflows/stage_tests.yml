@@ -44,11 +44,13 @@ jobs:
             --argument-rgx=^[a-z][a-z_0-9]*$ \
             --variable-rgx=^[a-z][a-z_0-9]*$ \
             --max-line-length=120 \
+            --ignore=_version.py \
             guess_testing
 
       - name: Inspect Vulnerabilities
         run: |
           echo Vulnerabilities:
+          # B101,B404,B603 due to versioneer
           bandit \
-            --skip B311 \
+            --skip B101,B311,B404,B603 \
             --recursive guess_testing
