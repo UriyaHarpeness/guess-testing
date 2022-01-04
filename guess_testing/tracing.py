@@ -1,5 +1,4 @@
 import dis
-import inspect
 from collections import defaultdict
 from sys import gettrace, settrace
 from typing import Callable, Optional, Sequence, Set, Tuple, Union
@@ -10,24 +9,27 @@ class Tracer:
     A class for tracing execution of a specific scope.
     """
 
-    def __init__(self, funcs: Union[Sequence[Callable], Callable]):
+    def __init__(self, funcs: Union[Sequence[Callable], Callable], trace_opcodes: bool = False):
         """
         Constructor.
 
         Args:
             funcs: The scope to trace.
+            trace_opcodes: Whether to trace opcodes as well, the default coverage is measured by lines, this is more
+                thorough.
         """
         self.funcs = (funcs,) if callable(funcs) else funcs
+        self.trace_opcodes = trace_opcodes
         self.scope = defaultdict(set)
         for func in self.funcs:
-            path, lines = self.get_func_scope(func)
-            self.scope[path].update(lines)
+            path, lines, opcode_offsets = self.get_func_scope(func)
+            self.scope[path].update(opcode_offsets if self.trace_opcodes else lines)
         self.original_trace = None
         self.runs = None
         self.run_id = None
 
     @staticmethod
-    def get_func_scope(func: Callable) -> Tuple[str, Set[int]]:
+    def get_func_scope(func: Callable) -> Tuple[str, Set[int], Set[Tuple[int, int]]]:
         """
         Get the scope of a function.
 
@@ -35,13 +37,19 @@ class Tracer:
             func: The function to get scope for.
 
         Returns:
-            The file and lines inside the function's scope.
+            The file, lines, and opcode offsets inside the function's scope.
         """
         bytecode = dis.Bytecode(func)
-        lines = {bytecode.first_line}
-        lines.update(instruction.starts_line for instruction in bytecode if instruction.starts_line is not None)
-        path = inspect.getsourcefile(func)
-        return path, lines
+        current_line = bytecode.first_line
+        lines = {current_line}
+        opcode_offsets = {(current_line, -1)}
+        for instruction in bytecode:
+            if instruction.starts_line:
+                current_line = instruction.starts_line
+                lines.add(current_line)
+            opcode_offsets.add((current_line, instruction.offset))
+        path = bytecode.codeobj.co_filename
+        return path, lines, opcode_offsets
 
     def trace(self, frame: 'frame', event: str, arg=None) -> Optional[Callable]:
         """
@@ -63,8 +71,10 @@ class Tracer:
         if filename not in self.scope:
             return None
 
+        frame.f_trace_opcodes = self.trace_opcodes
+        opcode_offset = frame.f_lasti
         line_no = frame.f_lineno
-        self.runs[self.run_id][filename].add(line_no)
+        self.runs[self.run_id][filename].add((line_no, opcode_offset) if self.trace_opcodes else line_no)
         return self.trace
 
     def __enter__(self):

@@ -10,8 +10,8 @@ inputs. Save your strength and let the CPU do the hard work.
 
 ## Getting Started
 
-First off clone this project, it is written for [Python 3.6.8](https://www.python.org/downloads/release/python-368/),
-but due to its basic requirements can work on many other versions.
+First off clone this project, it is written for [Python 3.8](https://www.python.org/downloads/release/python-38/), but
+due to its basic requirements can work on many other versions.
 
 ### Prerequisites
 
@@ -39,6 +39,8 @@ Guess Testing is package that can be imported and used for many reasons, such as
 2. Finding the possible exceptions the code can throw and from where, and which arguments cause these behaviors.
 3. Finding all the possible return values of a function, and which arguments cause them.
 4. Any form of stress testing, analysing an unknown code, and many, many more cases.
+5. Supports coverage checking for instructions as well, and not only line numbers, meaning `1 if False else 0` will be
+   shown as not covered.
 
 As a python package, it is importable, like so:
 
@@ -93,6 +95,32 @@ Now all that's left is running the code, let's see it in action!
 > The code in this example run can be found in [Example E](examples/example_e.py).
 >
 > More examples are available [here](examples).
+
+Now how about checking a code that cannot be *really* covered (from [Example H](examples/example_h.py))?
+
+```python
+from guess_testing.guess import Guesser
+
+
+def h(a: int) -> str:
+    return 'a' if a == 666 else 'b'
+
+
+gg = Guesser(h, trace_opcodes=False)
+gg.guess(call_limit=10000)
+print(f'Attempts: {gg.attempts_number}, coverage: {gg.coverage["coverage"]}.')
+
+gg = Guesser(h, trace_opcodes=True)
+gg.guess(call_limit=10000)
+print(f'Attempts: {gg.attempts_number}, coverage: {gg.coverage["coverage"]}.')
+```
+
+And here is the output:
+
+```text
+Attempts: 1, coverage: 100.0.
+Attempts: 10000, coverage: 77.77777777777777.
+```
 
 #### Generators
 
@@ -159,12 +187,12 @@ b'3o;u'
 
 ## Technologies and Capabilities
 
-* Guess Testing is written in [Python 3.6.8](https://www.python.org/downloads/release/python-368/).
+* Guess Testing is written in [Python 3.8](https://www.python.org/downloads/release/python-38/).
 * Does not require any additional packages.
 * Features a pretty progress bar for enhanced satisfaction.
 * Very lightweight.
-* Flexible guessing stop conditions, like full coverage, an exception is thrown, certain time has passed, call count
-  limit is reached...
+* Flexible guessing stop conditions, like full coverage (by lines and instructions), an exception is thrown, certain
+  time has passed, call count limit is reached...
 * Allows getting information by coverage, return values, and exceptions.
 * Easily extendable.
 * What more can I say? It's small, standalone, and can actually be of use.

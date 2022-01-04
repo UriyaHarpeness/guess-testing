@@ -36,17 +36,19 @@ class Guesser:
 
     logger = logging.getLogger('guess-testing')
 
-    def __init__(self, funcs: Union[Sequence[Callable], Callable], positional: Sequence[Generator] = (),
-                 keyword: Dict[str, Generator] = None):
+    def __init__(self, funcs: Union[Sequence[Callable], Callable], trace_opcodes: bool = False,
+                 positional: Sequence[Generator] = (), keyword: Dict[str, Generator] = None):
         """
         Constructor.
 
         Args:
             funcs: The scope of the code to guess on, the first function is the entry point for the guesser.
+            trace_opcodes: Whether to trace opcodes as well, the default coverage is measured by lines, this is more
+                thorough.
             positional: The generators to use for positional arguments.
             keyword: The generators to use for keyword arguments.
         """
-        self.tracer = Tracer(funcs)
+        self.tracer = Tracer(funcs, trace_opcodes)
         if keyword is None:
             keyword = {}
         if positional == () and keyword == {}:
@@ -135,7 +137,7 @@ class Guesser:
 
     def guess(self,
               stop_conditions: int = StopConditions.FULL_COVERAGE | StopConditions.TIMEOUT | StopConditions.CALL_LIMIT,
-              call_limit: int = float('inf'), timeout: int = 10,
+              call_limit: int = float('inf'), timeout: float = 10,
               suppress_exceptions: Union[Sequence[Type[Exception]], Type[Exception]] = (),
               pretty: bool = False) -> 'Guesser':
         """
@@ -218,6 +220,16 @@ class Guesser:
             self.reduce_lines(scope, subsets[most_cover])
 
         return cases, scope
+
+    @property
+    def attempts_number(self) -> int:
+        """
+        Get the number of attempts that were run.
+
+        Returns:
+            The number of attempts that were run.
+        """
+        return self.tracer.run_id if self.tracer.run_id is None else self.tracer.run_id + 1
 
     @property
     def coverage(self) -> Optional[dict]:

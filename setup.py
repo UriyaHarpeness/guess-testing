@@ -31,5 +31,5 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(exclude=('examples',)),
     install_requires=[],
-    python_requires='>=3.6'
+    python_requires='>=3.7'
 )
