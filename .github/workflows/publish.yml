@@ -18,7 +18,7 @@ jobs:
       - name: Publish Python Package
         uses: mariamrf/py-package-publish-action@v1.1.0
         with:
-          python_version: 3.6.8
+          python_version: 3.8.6
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}

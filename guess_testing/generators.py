@@ -43,7 +43,7 @@ class Generator(abc.ABC):
         """
         String representation of the generator.
         """
-        return '%s(%r)' % (self.__class__, self.__dict__)
+        return f'{self.__class__}({self.__dict__})'
 
     def __repr__(self) -> str:
         """
@@ -526,9 +526,13 @@ class TypingGeneratorFactory:
 
     # Mapping of continuous typing annotation and the matching generator.
     CONTINUOUS_ANNOTATION_TO_GENERATOR = {
+        list: ListGenerator,
         typing.List: ListGenerator,
+        dict: DictGenerator,
         typing.Dict: DictGenerator,
+        set: SetGenerator,
         typing.Set: SetGenerator,
+        tuple: TupleGenerator,
         typing.Tuple: TupleGenerator,
         typing.Any: AnyGenerator,
         typing.Optional: Optional,
