@@ -20,8 +20,8 @@ def b(a: int, c: int):
         return 3
 
 
-gg = Guesser((b,))
-gg.guess(suppress_exceptions=ZeroDivisionError)
-print(gg.coverage)
-print(gg.exceptions)
-print(gg.return_values)
+guesser = Guesser((b,))
+guesser.guess(suppress_exceptions=ZeroDivisionError)
+print(guesser.coverage)
+print(guesser.exceptions)
+print(guesser.return_values)
