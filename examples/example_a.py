@@ -9,7 +9,7 @@ def a(a: typing.Tuple[int, float, str], g: object):
     return (type(a), a)
 
 
-gg = Guesser((a,), positional=(generators.IntGenerator(0, 10), generators.GeneratorCollection(
+gg = Guesser((a,), positional=(generators.IntGenerator(0, 10), generators.UnionGenerator(
     [generators.IntGenerator(0, 10), generators.StringGenerator()])))
 
 gg.guess(suppress_exceptions=Exception, stop_conditions=StopConditions.CALL_LIMIT, call_limit=100)

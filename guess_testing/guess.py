@@ -58,37 +58,37 @@ class Guesser:
         self.run_arguments = []
 
     @staticmethod
-    def reduce_lines(a: Lines, b: Lines):
+    def reduce_lines(to_reduce: Lines, reduce_by: Lines):
         """
         Reduce a lines structure.
         Removes all the values existing in lines b from lines a.
 
         Args:
-            a: The lines to reduce.
-            b: The lines to reduce by.
+            to_reduce: The lines to reduce.
+            reduce_by: The lines to reduce by.
         """
-        for k in a.keys() & b.keys():
-            a[k] -= b[k]
-            if not a[k]:
-                a.pop(k)
+        for k in to_reduce.keys() & reduce_by.keys():
+            to_reduce[k] -= reduce_by[k]
+            if not to_reduce[k]:
+                to_reduce.pop(k)
 
     @staticmethod
-    def equalize_lines(a: Lines, b: Lines):
+    def equalize_lines(to_equalize: Lines, equalize_by: Lines):
         """
         Equalize a lines structure.
         Removes all the values that do not exist in lines b from lines a.
 
         Args:
-            a: The lines to equalize.
-            b: The lines to equalize by.
+            to_equalize: The lines to equalize.
+            equalize_by: The lines to equalize by.
         """
-        for k in set(a.keys()):
-            if k not in b:
-                a.pop(k)
+        for k in set(to_equalize.keys()):
+            if k not in equalize_by:
+                to_equalize.pop(k)
                 continue
-            a[k] &= b[k]
-            if not a[k]:
-                a.pop(k)
+            to_equalize[k] &= equalize_by[k]
+            if not to_equalize[k]:
+                to_equalize.pop(k)
 
     @staticmethod
     def lines_length(lines: Lines) -> int:
