@@ -311,9 +311,9 @@ class SetGenerator(IterableGenerator):
         return f'Set[{self.sub_generator}]'
 
 
-class TupleSequenceGenerator(IterableGenerator):
+class TupleEllipsisGenerator(IterableGenerator):
     """
-    Generator for a tuple of values.
+    Generator for a tuple of values with ellipsis.
     """
 
     config = GeneratorConfig(1, True, True)
@@ -322,7 +322,7 @@ class TupleSequenceGenerator(IterableGenerator):
         return tuple(super().__call__())
 
     def __str__(self) -> str:
-        return f'Tuple[{str(self.sub_generator)}]'
+        return f'Tuple[{str(self.sub_generator)}, ...]'
 
 
 class RangeGenerator(Generator):
@@ -471,7 +471,7 @@ GENERATORS = [
     RangeGenerator,
     IterableGenerator,
     ListGenerator,
-    TupleSequenceGenerator,
+    TupleEllipsisGenerator,
     SetGenerator,
     OptionalGenerator,
     DictGenerator,
@@ -569,13 +569,13 @@ class TypingGeneratorFactory:
         list: lambda: ListGenerator(AnyGenerator()),
         dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
         set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        tuple: lambda: TupleSequenceGenerator(AnyGenerator()),
+        tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
 
         typing.Iterable: lambda: IterableGenerator(AnyGenerator()),
         typing.List: lambda: ListGenerator(AnyGenerator()),
         typing.Dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
         typing.Set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        typing.Tuple: lambda: TupleSequenceGenerator(AnyGenerator()),
+        typing.Tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
         typing.Any: partial(AnyGenerator),
         typing.Optional: lambda: OptionalGenerator(AnyGenerator())
     }
@@ -596,7 +596,7 @@ class TypingGeneratorFactory:
         typing.Tuple: TupleGenerator,
         object: AnyGenerator,
         typing.Any: AnyGenerator,
-        typing.Optional: Optional,
+        typing.Optional: OptionalGenerator,
         typing.Union: UnionGenerator
     }
 
@@ -624,8 +624,18 @@ class TypingGeneratorFactory:
                 if not args:
                     return TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR[annotation]()
 
-                args_generators = [TypingGeneratorFactory.get_generator(arg) for arg in args]
                 matching_generator = TypingGeneratorFactory.CONTINUOUS_ANNOTATION_TO_GENERATOR[origin]
+
+                # Handling Tuple and ellipsis.
+                if origin is tuple:
+                    if args[-1] is Ellipsis:
+                        if len(args) != 2:
+                            raise ValueError(f'Invalid ellipsis usage in type tuple: "{annotation}".')
+
+                        matching_generator = TupleEllipsisGenerator
+                        args = args[:1]
+
+                args_generators = [TypingGeneratorFactory.get_generator(arg) for arg in args]
                 return matching_generator(args_generators) if \
                     matching_generator.config.sub_generators_number == -1 else \
                     matching_generator(*args_generators)

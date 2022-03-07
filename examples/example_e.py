@@ -17,8 +17,8 @@ def e(a: typing.List[int]) -> str:
     return 'boo...'
 
 
-gg = Guesser(e)
-gg.guess(stop_conditions=StopConditions.FULL_COVERAGE, suppress_exceptions=ZeroDivisionError, pretty=True)
-print(gg.coverage)
-print(gg.exceptions)
-print(gg.return_values)
+guesser = Guesser(e)
+guesser.guess(stop_conditions=StopConditions.FULL_COVERAGE, suppress_exceptions=ZeroDivisionError, pretty=True)
+print(guesser.coverage)
+print(guesser.exceptions)
+print(guesser.return_values)
