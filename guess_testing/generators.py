@@ -187,7 +187,7 @@ class BytesGenerator(StringGenerator):
         return 'bytes'
 
 
-class ChooseGenerator(Generator):
+class ChoiceGenerator(Generator):
     """
     Generator for choosing a random given value.
     """
@@ -207,7 +207,7 @@ class ChooseGenerator(Generator):
         return random.choice(self.fixed_values)
 
     def __str__(self) -> str:
-        return f'FixedUnion[{", ".join(map(str, self.fixed_values))}]'
+        return f'Choice[{", ".join(sorted(set(map(str, self.fixed_values))))}]'
 
 
 class FixedGenerator(Generator):
@@ -253,7 +253,7 @@ class UnionGenerator(Generator):
         return random.choice(self.sub_generators)()
 
     def __str__(self) -> str:
-        return f'Union[{", ".join(map(str, self.sub_generators))}]'
+        return f'Union[{", ".join(sorted(set(map(str, self.sub_generators))))}]'
 
 
 class IterableGenerator(Generator):
@@ -477,7 +477,7 @@ GENERATORS = [
     DictGenerator,
     TupleGenerator,
     UnionGenerator,
-    ChooseGenerator,
+    ChoiceGenerator,
     FixedGenerator,
     TransformGenerator
 ]
