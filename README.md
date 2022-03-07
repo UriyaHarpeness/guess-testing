@@ -81,11 +81,11 @@ def e(a: typing.List[int]) -> str:
     return 'boo...'
 
 
-gg = Guesser(e)
-gg.guess(stop_conditions=StopConditions.FULL_COVERAGE, suppress_exceptions=ZeroDivisionError, pretty=True)
-print(gg.coverage)
-print(gg.exceptions)
-print(gg.return_values)
+guesser = Guesser(e)
+guesser.guess(stop_conditions=StopConditions.FULL_COVERAGE, suppress_exceptions=ZeroDivisionError, pretty=True)
+print(guesser.coverage)
+print(guesser.exceptions)
+print(guesser.return_values)
 ```
 
 Now all that's left is running the code, let's see it in action!
@@ -106,13 +106,13 @@ def h(a: int) -> str:
     return 'a' if a == 666 else 'b'
 
 
-gg = Guesser(h, trace_opcodes=False)
-gg.guess(call_limit=10000)
-print(f'Attempts: {gg.attempts_number}, coverage: {gg.coverage["coverage"]}.')
+guesser = Guesser(h, trace_opcodes=False)
+guesser.guess(call_limit=10000)
+print(f'Attempts: {guesser.attempts_number}, coverage: {guesser.coverage["coverage"]}.')
 
-gg = Guesser(h, trace_opcodes=True)
-gg.guess(call_limit=10000)
-print(f'Attempts: {gg.attempts_number}, coverage: {gg.coverage["coverage"]}.')
+guesser = Guesser(h, trace_opcodes=True)
+guesser.guess(call_limit=10000)
+print(f'Attempts: {guesser.attempts_number}, coverage: {guesser.coverage["coverage"]}.')
 ```
 
 And here is the output:
@@ -195,6 +195,7 @@ Any[List[Set[Tuple[range]]]]
   time has passed, call count limit is reached...
 * Allows getting information by coverage, return values, and exceptions.
 * Easily extendable.
+* Contains a string representation for the generators that fits `typing` and the builtin python types.
 * What more can I say? It's small, standalone, and can actually be of use.
 
 ## Documentation

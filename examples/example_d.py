@@ -18,8 +18,8 @@ def d(a: typing.List[int]):
     return dd(a[0]) + ddd(a[-1])
 
 
-gg = Guesser((d, dd, ddd))
-gg.guess(stop_conditions=StopConditions.FULL_COVERAGE, pretty=True)
-print(gg.coverage)
-print(gg.exceptions)
-print(gg.return_values)
+guesser = Guesser((d, dd, ddd))
+guesser.guess(stop_conditions=StopConditions.FULL_COVERAGE, pretty=True)
+print(guesser.coverage)
+print(guesser.exceptions)
+print(guesser.return_values)

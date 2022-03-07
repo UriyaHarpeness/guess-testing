@@ -5,8 +5,8 @@ def c():
     1 / 0
 
 
-gg = Guesser((c,))
-gg.guess(pretty=True)
-print(gg.coverage)
-print(gg.exceptions)
-print(gg.return_values)
+guesser = Guesser((c,))
+guesser.guess(pretty=True)
+print(guesser.coverage)
+print(guesser.exceptions)
+print(guesser.return_values)
