@@ -1,6 +1,6 @@
 import typing
 
-from guess_testing.generators import TypingGeneratorFactory
+from guess_testing.typing_generators_factory import TypingGeneratorFactory
 
 
 def e(a: typing.List[int]) -> str:
