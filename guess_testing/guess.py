@@ -5,8 +5,9 @@ import logging
 from collections import defaultdict
 from typing import Callable, Dict, Optional, Sequence, Set, Tuple, Type, Union
 
-from guess_testing.generators import Generator, TypingGeneratorFactory
+from guess_testing.generators import Generator
 from guess_testing.tracing import Tracer
+from guess_testing.typing_generators_factory import TypingGeneratorFactory
 
 # A definition for a type that describes files and their line numbers.
 Lines = Dict[str, Set[int]]

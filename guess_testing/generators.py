@@ -1,56 +1,9 @@
-import abc
-import collections.abc
-import inspect
 import random
-import typing
-from dataclasses import dataclass
-from functools import partial
-from inspect import signature
 from typing import Any, Callable, Dict
 from typing import Generator as GeneratorT
 from typing import List, Optional, Sequence, Set, Tuple
 
-
-@dataclass
-class GeneratorConfig:
-    """
-    Configuration describing each generator.
-    """
-    sub_generators_number: int  # The number of sub generators the generator requires.
-    requires_only_generators: bool  # Does the generator require only generators for initialization.
-    immutable: bool  # Is the generator's result immutable.
-
-
-class Generator(abc.ABC):
-    """
-    Base class for the generators.
-    """
-
-    @property
-    @abc.abstractmethod
-    def config(self) -> GeneratorConfig:
-        """
-        Configuration of the generator.
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def __call__(self) -> Any:
-        """
-        Generate a value.
-        """
-
-    def __repr__(self) -> str:
-        """
-        String representation of the generator.
-        """
-        return str(self)
-
-    @abc.abstractmethod
-    def __str__(self) -> str:
-        """
-        String representation of the generator.
-        """
+from guess_testing._base_generator import Generator, GeneratorConfig
 
 
 class IntGenerator(Generator):
@@ -69,12 +22,12 @@ class IntGenerator(Generator):
             stop: Maximum value (excluding).
             step: The jumps between the possible values from the minimum value until the maximum value.
         """
-        self.start = start
-        self.stop = stop
-        self.step = step
+        self._start = start
+        self._stop = stop
+        self._step = step
 
     def __call__(self) -> int:
-        return random.randrange(self.start, self.stop, self.step)
+        return random.randrange(self._start, self._stop, self._step)
 
     def __str__(self) -> str:
         return 'int'
@@ -96,17 +49,50 @@ class FloatGenerator(Generator):
             stop: Maximum value (excluding).
             step: The jumps between the possible values from the minimum value until the maximum value.
         """
-        self.start = start
-        self.stop = stop
-        self.step = step
+        self._start = start
+        self._stop = stop
+        self._step = step
 
     def __call__(self) -> float:
-        if not self.step:
-            return random.uniform(self.start, self.stop)
-        return random.randrange(int(self.start / self.step), int(self.stop / self.step)) * self.step
+        if not self._step:
+            return random.uniform(self._start, self._stop)
+        return random.randrange(int(self._start / self._step), int(self._stop / self._step)) * self._step
 
     def __str__(self) -> str:
         return 'float'
+
+
+class ComplexGenerator(Generator):
+    """
+    Generator for complex values.
+    """
+
+    config = GeneratorConfig(0, True, True)
+
+    def __init__(self, real_start: float = -2 ** 16, real_stop: float = 2 ** 16, real_step: Optional[float] = None,
+                 imaginary_start: float = -2 ** 16, imaginary_stop: float = 2 ** 16,
+                 imaginary_step: Optional[float] = None):
+        """
+        Constructor.
+
+        Args:
+            real_start: Minimum value for the real part (including).
+            real_stop: Maximum value for the real part (excluding).
+            real_step: The jumps between the possible values from the minimum value until the maximum value for the real
+                part.
+            imaginary_start: Minimum value for the imaginary part (including).
+            imaginary_stop: Maximum value for the imaginary part (excluding).
+            imaginary_step: The jumps between the possible values from the minimum value until the maximum value for the
+                imaginary part.
+        """
+        self._real_generator = FloatGenerator(real_start, real_stop, real_step)
+        self._imaginary_generator = FloatGenerator(imaginary_start, imaginary_stop, imaginary_step)
+
+    def __call__(self) -> complex:
+        return complex(self._real_generator(), self._imaginary_generator())
+
+    def __str__(self) -> str:
+        return 'complex'
 
 
 class BoolGenerator(Generator):
@@ -147,13 +133,13 @@ class StringGenerator(Generator):
             max_length: Maximum value (including).
             selection: A string to choose characters from.
         """
-        self.min_length = min_length
-        self.max_length = max_length
-        self.selection = selection
+        self._min_length = min_length
+        self._max_length = max_length
+        self._selection = selection
 
     def __call__(self) -> str:
         return ''.join(
-            random.choice(self.selection) for _ in range(random.randrange(self.min_length, self.max_length + 1)))
+            random.choice(self._selection) for _ in range(random.randrange(self._min_length, self._max_length + 1)))
 
     def __str__(self) -> str:
         return 'str'
@@ -178,59 +164,55 @@ class BytesGenerator(StringGenerator):
             encoding: The encoding to use.
         """
         super().__init__(min_length, max_length, selection)
-        self.encoding = encoding
+        self._encoding = encoding
 
     def __call__(self) -> bytes:
-        return super().__call__().encode(self.encoding)
+        return super().__call__().encode(self._encoding)
 
     def __str__(self) -> str:
         return 'bytes'
 
 
-class ChoiceGenerator(Generator):
+class LiteralGenerator(Generator):
     """
-    Generator for choosing a random given value.
-    """
-
-    config = GeneratorConfig(-1, False, True)
-
-    def __init__(self, fixed_values: Sequence[Any]):
-        """
-        Constructor.
-
-        Args:
-            fixed_values: The fixed values to choose from for generating a value.
-        """
-        self.fixed_values = fixed_values
-
-    def __call__(self) -> Any:
-        return random.choice(self.fixed_values)
-
-    def __str__(self) -> str:
-        return f'Choice[{", ".join(sorted(set(map(str, self.fixed_values))))}]'
-
-
-class FixedGenerator(Generator):
-    """
-    Generator for a fixed value.
+    Generator for a literal value.
     """
 
     config = GeneratorConfig(1, False, True)
 
-    def __init__(self, fixed_value: Any):
+    def __init__(self, literal_value: Any):
         """
         Constructor.
 
         Args:
-            fixed_value: The fixed value to generate.
+            literal_value: The literal value to generate.
         """
-        self.fixed_value = fixed_value
+        self._literal_value = literal_value
 
     def __call__(self) -> Any:
-        return self.fixed_value
+        return self._literal_value
 
     def __str__(self) -> str:
-        return f'Fixed[{self.fixed_value}]'
+        return f'Literal[{self._literal_value}]'
+
+
+class NoneGenerator(Generator):
+    """
+    Generator for a None value.
+    """
+
+    config = GeneratorConfig(0, True, True)
+
+    def __init__(self):
+        """
+        Constructor.
+        """
+
+    def __call__(self) -> None:
+        return None
+
+    def __str__(self) -> str:
+        return 'None'
 
 
 class UnionGenerator(Generator):
@@ -247,13 +229,13 @@ class UnionGenerator(Generator):
         Args:
             sub_generators: The generators in the union for generating a value.
         """
-        self.sub_generators = sub_generators
+        self._sub_generators = sub_generators
 
     def __call__(self) -> Any:
-        return random.choice(self.sub_generators)()
+        return random.choice(self._sub_generators)()
 
     def __str__(self) -> str:
-        return f'Union[{", ".join(sorted(set(map(str, self.sub_generators))))}]'
+        return f'Union[{", ".join(sorted(set(map(str, self._sub_generators))))}]'
 
 
 class IterableGenerator(Generator):
@@ -272,15 +254,15 @@ class IterableGenerator(Generator):
             min_length: Minimum length (including).
             max_length: Maximum length (including).
         """
-        self.sub_generator = sub_generator
-        self.min_length = min_length
-        self.max_length = max_length
+        self._sub_generator = sub_generator
+        self._min_length = min_length
+        self._max_length = max_length
 
     def __call__(self) -> GeneratorT[Any, Any, Any]:
-        return (self.sub_generator() for _ in range(random.randint(self.min_length, self.max_length)))
+        return (self._sub_generator() for _ in range(random.randint(self._min_length, self._max_length)))
 
     def __str__(self) -> str:
-        return f'Iterable[{self.sub_generator}]'
+        return f'Iterable[{self._sub_generator}]'
 
 
 class ListGenerator(IterableGenerator):
@@ -294,7 +276,7 @@ class ListGenerator(IterableGenerator):
         return list(super().__call__())
 
     def __str__(self) -> str:
-        return f'List[{self.sub_generator}]'
+        return f'List[{self._sub_generator}]'
 
 
 class SetGenerator(IterableGenerator):
@@ -308,7 +290,7 @@ class SetGenerator(IterableGenerator):
         return set(super().__call__())
 
     def __str__(self) -> str:
-        return f'Set[{self.sub_generator}]'
+        return f'Set[{self._sub_generator}]'
 
 
 class TupleEllipsisGenerator(IterableGenerator):
@@ -322,7 +304,7 @@ class TupleEllipsisGenerator(IterableGenerator):
         return tuple(super().__call__())
 
     def __str__(self) -> str:
-        return f'Tuple[{str(self.sub_generator)}, ...]'
+        return f'Tuple[{str(self._sub_generator)}, ...]'
 
 
 class RangeGenerator(Generator):
@@ -342,15 +324,16 @@ class RangeGenerator(Generator):
             min_step: The minimum step for the range (including).
             max_step: The maximum step for the range (including).
         """
-        self.minimum = minimum
-        self.maximum = maximum
-        self.min_step = min_step
-        self.max_step = max_step
+        self._minimum = minimum
+        self._maximum = maximum
+        self._min_step = min_step
+        self._max_step = max_step
 
     def __call__(self) -> range:
-        start = random.randint(self.minimum, self.maximum - 1)
-        stop = random.randint(start + 1, self.maximum)
-        step = random.choice([x for x in range(self.min_step, self.max_step) if x != 0 and abs(x) <= abs(start - stop)])
+        start = random.randint(self._minimum, self._maximum - 1)
+        stop = random.randint(start + 1, self._maximum)
+        step = random.choice(
+            [x for x in range(self._min_step, self._max_step) if x != 0 and abs(x) <= abs(start - stop)])
         start, stop = sorted((start, stop), reverse=step < 0)
         return range(start, stop, step)
 
@@ -373,14 +356,14 @@ class OptionalGenerator(Generator):
             sub_generator: The generator to use for generating a value.
             null_chance: The change of generating a None value, a float between 0 and 1.
         """
-        self.null_chance = null_chance
-        self.sub_generator = sub_generator
+        self._null_chance = null_chance
+        self._sub_generator = sub_generator
 
     def __call__(self) -> Optional[Any]:
-        return None if random.random() < self.null_chance else self.sub_generator()
+        return None if random.random() < self._null_chance else self._sub_generator()
 
     def __str__(self) -> str:
-        return f'Optional[{self.sub_generator}]'
+        return f'Optional[{self._sub_generator}]'
 
 
 class DictGenerator(Generator):
@@ -401,17 +384,17 @@ class DictGenerator(Generator):
             min_length: The minimum length of the dictionary (including).
             max_length: The maximum length of the dictionary (including).
         """
-        self.keys_generator = keys_generator
-        self.values_generator = values_generator
-        self.min_length = min_length
-        self.max_length = max_length
+        self._keys_generator = keys_generator
+        self._values_generator = values_generator
+        self._min_length = min_length
+        self._max_length = max_length
 
     def __call__(self) -> Dict[Any, Any]:
-        return {self.keys_generator(): self.values_generator() for _ in
-                range(random.randint(self.min_length, self.max_length))}
+        return {self._keys_generator(): self._values_generator() for _ in
+                range(random.randint(self._min_length, self._max_length))}
 
     def __str__(self) -> str:
-        return f'Dict[{self.keys_generator}, {self.values_generator}]'
+        return f'Dict[{self._keys_generator}, {self._values_generator}]'
 
 
 class TupleGenerator(Generator):
@@ -428,13 +411,13 @@ class TupleGenerator(Generator):
         Args:
             sub_generators: The generators to use for generating the tuple.
         """
-        self.sub_generators = sub_generators
+        self._sub_generators = sub_generators
 
     def __call__(self) -> Tuple:
-        return tuple(generator() for generator in self.sub_generators)
+        return tuple(generator() for generator in self._sub_generators)
 
     def __str__(self) -> str:
-        return f'Tuple[{", ".join(map(str, self.sub_generators))}]'
+        return f'Tuple[{", ".join(map(str, self._sub_generators))}]'
 
 
 class TransformGenerator(Generator):
@@ -452,23 +435,26 @@ class TransformGenerator(Generator):
             sub_generator: The generator to use for generating the initial value.
             transformer: The transformation to run on the value received from the generator.
         """
-        self.sub_generator = sub_generator
-        self.transformer = transformer
+        self._sub_generator = sub_generator
+        self._transformer = transformer
 
     def __call__(self) -> Any:
-        return self.transformer(self.sub_generator())
+        return self._transformer(self._sub_generator())
 
     def __str__(self) -> str:
-        return f'Transform[{self.sub_generator}, {self.transformer}]'
+        return f'Transform[{self._sub_generator}, {self._transformer}]'
 
 
 # All the available generators.
-GENERATORS = [
+GENERATORS = {
+    BoolGenerator,
     IntGenerator,
     FloatGenerator,
+    ComplexGenerator,
     StringGenerator,
     BytesGenerator,
     RangeGenerator,
+    NoneGenerator,
     IterableGenerator,
     ListGenerator,
     TupleEllipsisGenerator,
@@ -477,10 +463,9 @@ GENERATORS = [
     DictGenerator,
     TupleGenerator,
     UnionGenerator,
-    ChoiceGenerator,
-    FixedGenerator,
+    LiteralGenerator,
     TransformGenerator
-]
+}
 
 
 class AnyGenerator(Generator):
@@ -491,10 +476,12 @@ class AnyGenerator(Generator):
     config = GeneratorConfig(-1, True, True)
 
     def __init__(self, sub_generators: Sequence[Generator] = None, max_depth: int = 5, require_hashable: bool = False):
-        self.sub_generator = self.generate_generator(sub_generators, max_depth, require_hashable)
+        self._sub_generators = sub_generators
+        self._max_depth = max_depth
+        self._require_hashable = require_hashable
 
     @staticmethod
-    def generate_generator(given_generator_options: List[Generator] = None, max_depth: int = 5,
+    def generate_generator(given_generator_options: Sequence[Generator] = None, max_depth: int = 5,
                            require_hashable: bool = False) -> Generator:
         """
         Generate a generator by a set of rules.
@@ -541,118 +528,10 @@ class AnyGenerator(Generator):
               range(chosen_generator.config.sub_generators_number)])
 
     def __call__(self) -> Any:
-        return self.sub_generator()
+        return self.generate_generator(self._sub_generators, self._max_depth, self._require_hashable)()
 
     def __str__(self) -> str:
-        return f'Any[{self.sub_generator}]'
+        return 'Any'
 
 
-GENERATORS.append(AnyGenerator)
-
-
-class TypingGeneratorFactory:
-    """
-    A factory for generating generators from type annotations.
-    """
-
-    # Mapping of final typing annotation and the matching generator initialization.
-    FINAL_ANNOTATION_TO_GENERATOR = {
-        int: partial(IntGenerator),
-        float: partial(FloatGenerator),
-        complex: partial(FloatGenerator),
-        bool: partial(BoolGenerator),
-        str: partial(StringGenerator),
-        bytes: partial(BytesGenerator),
-        range: partial(RangeGenerator),
-        object: partial(AnyGenerator),
-
-        list: lambda: ListGenerator(AnyGenerator()),
-        dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
-        set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
-
-        typing.Iterable: lambda: IterableGenerator(AnyGenerator()),
-        typing.List: lambda: ListGenerator(AnyGenerator()),
-        typing.Dict: lambda: DictGenerator(AnyGenerator(require_hashable=True), AnyGenerator()),
-        typing.Set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
-        typing.Tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
-        typing.Any: partial(AnyGenerator),
-        typing.Optional: lambda: OptionalGenerator(AnyGenerator())
-    }
-
-    # Mapping of continuous typing annotation and the matching generator.
-    CONTINUOUS_ANNOTATION_TO_GENERATOR = {
-        typing.Iterable: IterableGenerator,
-        collections.abc.Iterable: IterableGenerator,
-        list: ListGenerator,
-        typing.List: ListGenerator,
-        dict: DictGenerator,
-        typing.Dict: DictGenerator,
-        collections.abc.Mapping: DictGenerator,
-        set: SetGenerator,
-        typing.Set: SetGenerator,
-        collections.abc.Set: SetGenerator,
-        tuple: TupleGenerator,
-        typing.Tuple: TupleGenerator,
-        object: AnyGenerator,
-        typing.Any: AnyGenerator,
-        typing.Optional: OptionalGenerator,
-        typing.Union: UnionGenerator
-    }
-
-    @staticmethod
-    def get_generator(annotation: type) -> Generator:
-        """
-        Get a generator by annotation.
-
-        Args:
-            annotation: The type annotation to get a generator for.
-
-        Returns:
-            The matching generator.
-        """
-        if annotation is inspect._empty:
-            raise TypeError('Type not specified')
-
-        # todo: maybe support more typing types.
-        if annotation in TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR:
-            return TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR[annotation]()
-
-        if annotation.__module__ == 'typing':
-            origin, args = annotation.__origin__, annotation.__args__
-            if origin in TypingGeneratorFactory.CONTINUOUS_ANNOTATION_TO_GENERATOR:
-                if not args:
-                    return TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR[annotation]()
-
-                matching_generator = TypingGeneratorFactory.CONTINUOUS_ANNOTATION_TO_GENERATOR[origin]
-
-                # Handling Tuple and ellipsis.
-                if origin is tuple:
-                    if args[-1] is Ellipsis:
-                        if len(args) != 2:
-                            raise ValueError(f'Invalid ellipsis usage in type tuple: "{annotation}".')
-
-                        matching_generator = TupleEllipsisGenerator
-                        args = args[:1]
-
-                args_generators = [TypingGeneratorFactory.get_generator(arg) for arg in args]
-                return matching_generator(args_generators) if \
-                    matching_generator.config.sub_generators_number == -1 else \
-                    matching_generator(*args_generators)
-
-        raise ValueError(f'Could not interpret type "{annotation}".')
-
-    @staticmethod
-    def get_generators(func: Callable) -> Dict[str, Generator]:
-        """
-        Get generators for a function by its type annotations.
-
-        Args:
-            func: The function to get generators for.
-
-        Returns:
-            The generators matching the function's type annotations.
-        """
-        params = signature(func).parameters
-        # todo: maybe check also .kind of the parameter, like POSITIONAL_OR_KEYWORD.
-        return {name: TypingGeneratorFactory.get_generator(type_.annotation) for name, type_ in params.items()}
+GENERATORS.add(AnyGenerator)

@@ -11,12 +11,21 @@ def ii(a: Tuple[Union[str, int], ...]) -> None:
     pass
 
 
+def iii(a: Tuple[str, int]) -> None:
+    pass
+
+
 guesser = Guesser(i)
 print(guesser.keyword['a'])
 for _ in range(5):
     print(guesser.keyword['a']())
 
 guesser = Guesser(ii)
+print(guesser.keyword['a'])
+for _ in range(5):
+    print(guesser.keyword['a']())
+
+guesser = Guesser(iii)
 print(guesser.keyword['a'])
 for _ in range(5):
     print(guesser.keyword['a']())
