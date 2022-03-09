@@ -229,9 +229,9 @@ I hope that it can answer whichever questions that may arise.
 
 ## Contributing
 
-Feel free to contact me if you have any comments, questions, ideas, and anything else you think I should be aware of.
-Also, tell me what legendary matches have been played with Chess, or how playing against Stockfish improved your
-strategy, I'd love to know.
+Feel free to contact me if you have any comments, questions, ideas, and anything else you think I should be aware of. I
+would also love know to which edge cases Guess Testing helped you find, and what's the weirdest/most complicated type
+you generated.
 
 This project is licensed under the terms of the MIT license.
 
