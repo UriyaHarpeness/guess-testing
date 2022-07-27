@@ -1,5 +1,5 @@
 import random
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, cast
 
 from guess_testing._base_generator import Generator, GeneratorConfig
 
@@ -10,6 +10,8 @@ class IntGenerator(Generator[int]):
     """
 
     config = GeneratorConfig(0, True, True)
+
+    __slots__ = '_start', '_stop', '_step'
 
     def __init__(self, start: int = -2 ** 16, stop: int = 2 ** 16, step: int = 1):
         """
@@ -37,6 +39,8 @@ class FloatGenerator(Generator[float]):
     """
 
     config = GeneratorConfig(0, True, True)
+
+    __slots__ = '_start', '_stop', '_step'
 
     def __init__(self, start: float = -2 ** 16, stop: float = 2 ** 16, step: Optional[float] = None):
         """
@@ -66,6 +70,8 @@ class ComplexGenerator(Generator[complex]):
     """
 
     config = GeneratorConfig(0, True, True)
+
+    __slots__ = '_real_generator', '_imaginary_generator'
 
     def __init__(self, real_start: float = -2 ** 16, real_stop: float = 2 ** 16, real_step: Optional[float] = None,
                  imaginary_start: float = -2 ** 16, imaginary_stop: float = 2 ** 16,
@@ -100,6 +106,8 @@ class BoolGenerator(Generator[bool]):
 
     config = GeneratorConfig(0, True, True)
 
+    __slots__ = ()
+
     def __call__(self) -> bool:
         return random.choice((True, False))
 
@@ -121,6 +129,8 @@ class StringGenerator(Generator[str]):
     READABLE_OTHER = '!@#$%^&*()-=_+{}[]\\|/<>\'"`~;.,\n\t '
     ALL = ''.join(chr(x) for x in range(256))
     READABLE = UPPERCASE + LOWERCASE + NUMBERS + READABLE_OTHER
+
+    __slots__ = '_min_length', '_max_length', '_selection'
 
     def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = READABLE):
         """
@@ -150,6 +160,8 @@ class BytesGenerator(StringGenerator, Generator[bytes]):
 
     config = GeneratorConfig(0, True, True)
 
+    __slots__ = ('_encoding',)
+
     def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = StringGenerator.READABLE,
                  encoding: str = 'utf-8'):
         """
@@ -178,6 +190,8 @@ class LiteralGenerator(Generator[object]):
 
     config = GeneratorConfig(-1, False, True)
 
+    __slots__ = ('_literal_values',)
+
     def __init__(self, literal_values: Sequence[object]):
         """
         Constructor.
@@ -201,6 +215,8 @@ class NoneGenerator(Generator[None]):
 
     config = GeneratorConfig(0, True, True)
 
+    __slots__ = ()
+
     def __init__(self):
         """
         Constructor.
@@ -219,6 +235,8 @@ class UnionGenerator(Generator[object]):
     """
 
     config = GeneratorConfig(-1, True, True)
+
+    __slots__ = ('_sub_generators',)
 
     def __init__(self, sub_generators: Sequence[Generator]):
         """
@@ -242,6 +260,8 @@ class IterableGenerator(Generator[Iterable[object]]):
     """
 
     config = GeneratorConfig(1, True, False)
+
+    __slots__ = '_sub_generator', '_min_length', '_max_length'
 
     def __init__(self, sub_generator: Generator, min_length: int = 0, max_length: int = 2 ** 4):
         """
@@ -270,6 +290,8 @@ class ListGenerator(IterableGenerator, Generator[List[object]]):
 
     config = GeneratorConfig(1, True, False)
 
+    __slots__ = ()
+
     def __call__(self) -> List[object]:
         return list(super().__call__())
 
@@ -283,6 +305,8 @@ class SetGenerator(IterableGenerator, Generator[Set[object]]):
     """
 
     config = GeneratorConfig(1, True, False)
+
+    __slots__ = ()
 
     def __call__(self) -> Set[object]:
         return set(super().__call__())
@@ -298,6 +322,8 @@ class TupleEllipsisGenerator(IterableGenerator, Generator[Tuple[object, ...]]):
 
     config = GeneratorConfig(1, True, True)
 
+    __slots__ = ()
+
     def __call__(self) -> Tuple[object, ...]:
         return tuple(super().__call__())
 
@@ -311,6 +337,8 @@ class RangeGenerator(Generator[range]):
     """
 
     config = GeneratorConfig(0, True, True)
+
+    __slots__ = '_minimum', '_maximum', '_min_step', '_max_step'
 
     def __init__(self, minimum: int = -2 ** 8, maximum: int = 2 ** 8, min_step: int = -2 ** 4, max_step: int = 2 ** 4):
         """
@@ -346,6 +374,8 @@ class OptionalGenerator(Generator[Optional[object]]):
 
     config = GeneratorConfig(1, True, True)
 
+    __slots__ = '_null_chance', '_sub_generator'
+
     def __init__(self, sub_generator: Generator, null_chance: float = 0.5):
         """
         Constructor.
@@ -370,6 +400,8 @@ class DictGenerator(Generator[Dict[object, object]]):
     """
 
     config = GeneratorConfig(2, True, False)
+
+    __slots__ = '_keys_generator', '_values_generator', '_min_length', '_max_length'
 
     def __init__(self, keys_generator: Generator, values_generator: Generator, min_length: int = 0,
                  max_length: int = 2 ** 4):
@@ -402,6 +434,8 @@ class TupleGenerator(Generator[Tuple[object, ...]]):
 
     config = GeneratorConfig(-1, True, True)
 
+    __slots__ = ('_sub_generators',)
+
     def __init__(self, sub_generators: Sequence[Generator]):
         """
         Constructor.
@@ -424,6 +458,8 @@ class TransformGenerator(Generator[object]):
     """
 
     config = GeneratorConfig(1, False, False)
+
+    __slots__ = '_sub_generator', '_transformer'
 
     def __init__(self, sub_generator: Generator, transformer: Callable[[Any], Any]):
         """
@@ -510,11 +546,12 @@ class AnyGenerator(Generator):
         chosen_generator = random.choice(generator_options)
 
         if chosen_generator == SetGenerator:
-            return chosen_generator(AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True))
+            return cast(Type[SetGenerator], chosen_generator)(
+                AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True))
         if chosen_generator == DictGenerator:
-            return chosen_generator(AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True),
-                                    AnyGenerator.generate_generator(given_generator_options, max_depth - 1,
-                                                                    require_hashable))
+            return cast(Type[DictGenerator], chosen_generator)(
+                AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True),
+                AnyGenerator.generate_generator(given_generator_options, max_depth - 1, require_hashable))
 
         if chosen_generator.config.sub_generators_number == -1:
             return chosen_generator(
