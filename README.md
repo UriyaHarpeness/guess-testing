@@ -1,3 +1,5 @@
+![Guess Testing](logo.svg)
+
 # Guess Testing
 
 Welcome to Guess Testing!
@@ -151,31 +153,31 @@ import typing
 from guess_testing.typing_generators_factory import TypingGeneratorFactory
 
 
-def e(a: typing.List[int]) -> str:
+def f(a: typing.List[int]) -> str:
     pass
 
 
-generators = TypingGeneratorFactory.get_generators(e)
+generators = TypingGeneratorFactory.get_generators(f)
 print(generators)
 
 for _ in range(10):
-    print(generators['a']())
+    print(generators.keyword['a']())
 ```
 
 Now the result:
 
 ```text
-{'a': List[int]}
-[39784, 47413, 20590, 47366, -47725, 60081, 41957]
-[35520, 54323]
-[47232, -18372]
-[-28274, 30664, -65376, 41264, -25118, 1267, -46631, 15847, 64907, 14002, -26615, 37780]
+ParametersGenerators(positional=[], var_positional=Iterable[None], keyword={'a': List[int]}, var_keyword=Dict[None, None])
+[12405, -21511, -27079, 53831, 30705, 63145, -29037, -13356, 43919, -37399, -17513, -9125, 52108, -22998]
+[-45673, -25582, 14730, -29403, 29326, 51133, 15940, -43782, -28558, 62275]
+[15058, 24083, 49427, -60482, 34556, 28768, 47541, 34125, 18023, 63406, 55071, -5622, -50858, 64449, -56508, 29186]
+[-1099, -62520, 32445, 11092, 40268, -16754, -9336, -60278]
 []
-[26879, -9958, 12824]
-[-32159, -23371, -46221, 40098, 42298, 60795]
-[-8062, 64305, -14024, 46788]
-[-62397, 12193, -48413, -45434, -56422, -45250, 24665, 37593, -4881, -40823, 48727, 43525]
-[18760, -36428, -34772, -41072, 50803, 54740, -25575, 1038, 57881, -10428, -4403, 738, -6967, -48162, 19645]
+[18620, -11646, 8687, -51744, 2788, -64639]
+[-20770, -8160, -43784, -12910, 32457]
+[8820, 11288, 41938, -30188, -9662, -7796, 51550, 51373, -13318, -20437, 17889]
+[-6548, -55926, 28237, -913, 7181, -10664, 49494, 42848, -55882, 65131]
+[28287, -14622, 63845, 34029, 4292, -45424, -55058, -50316, 21225]
 ```
 
 Here's another one, a bit more extreme ([Example G](examples/example_g.py)):

@@ -1,12 +1,10 @@
 import random
-from typing import Any, Callable, Dict
-from typing import Generator as GeneratorT
-from typing import List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from guess_testing._base_generator import Generator, GeneratorConfig
 
 
-class IntGenerator(Generator):
+class IntGenerator(Generator[int]):
     """
     Generator for integer values.
     """
@@ -33,7 +31,7 @@ class IntGenerator(Generator):
         return 'int'
 
 
-class FloatGenerator(Generator):
+class FloatGenerator(Generator[float]):
     """
     Generator for float values.
     """
@@ -62,7 +60,7 @@ class FloatGenerator(Generator):
         return 'float'
 
 
-class ComplexGenerator(Generator):
+class ComplexGenerator(Generator[complex]):
     """
     Generator for complex values.
     """
@@ -95,7 +93,7 @@ class ComplexGenerator(Generator):
         return 'complex'
 
 
-class BoolGenerator(Generator):
+class BoolGenerator(Generator[bool]):
     """
     Generator for boolean values.
     """
@@ -109,7 +107,7 @@ class BoolGenerator(Generator):
         return 'bool'
 
 
-class StringGenerator(Generator):
+class StringGenerator(Generator[str]):
     """
     Generator for string values.
     """
@@ -145,7 +143,7 @@ class StringGenerator(Generator):
         return 'str'
 
 
-class BytesGenerator(StringGenerator):
+class BytesGenerator(StringGenerator, Generator[bytes]):
     """
     Generator for bytes values.
     """
@@ -173,30 +171,30 @@ class BytesGenerator(StringGenerator):
         return 'bytes'
 
 
-class LiteralGenerator(Generator):
+class LiteralGenerator(Generator[object]):
     """
     Generator for a literal value.
     """
 
-    config = GeneratorConfig(1, False, True)
+    config = GeneratorConfig(-1, False, True)
 
-    def __init__(self, literal_value: Any):
+    def __init__(self, literal_values: Sequence[object]):
         """
         Constructor.
 
         Args:
-            literal_value: The literal value to generate.
+            literal_values: The literal value to generate.
         """
-        self._literal_value = literal_value
+        self._literal_values = literal_values
 
-    def __call__(self) -> Any:
-        return self._literal_value
+    def __call__(self) -> object:
+        return random.choice(self._literal_values)
 
     def __str__(self) -> str:
-        return f'Literal[{self._literal_value}]'
+        return f'Literal[{", ".join(sorted(set(map(str, self._literal_values))))}]'
 
 
-class NoneGenerator(Generator):
+class NoneGenerator(Generator[None]):
     """
     Generator for a None value.
     """
@@ -215,7 +213,7 @@ class NoneGenerator(Generator):
         return 'None'
 
 
-class UnionGenerator(Generator):
+class UnionGenerator(Generator[object]):
     """
     Generator for a union of generators.
     """
@@ -231,14 +229,14 @@ class UnionGenerator(Generator):
         """
         self._sub_generators = sub_generators
 
-    def __call__(self) -> Any:
+    def __call__(self) -> object:
         return random.choice(self._sub_generators)()
 
     def __str__(self) -> str:
         return f'Union[{", ".join(sorted(set(map(str, self._sub_generators))))}]'
 
 
-class IterableGenerator(Generator):
+class IterableGenerator(Generator[Iterable[object]]):
     """
     Generator for iterable values.
     """
@@ -258,56 +256,56 @@ class IterableGenerator(Generator):
         self._min_length = min_length
         self._max_length = max_length
 
-    def __call__(self) -> GeneratorT[Any, Any, Any]:
+    def __call__(self) -> Iterable[object]:
         return (self._sub_generator() for _ in range(random.randint(self._min_length, self._max_length)))
 
     def __str__(self) -> str:
         return f'Iterable[{self._sub_generator}]'
 
 
-class ListGenerator(IterableGenerator):
+class ListGenerator(IterableGenerator, Generator[List[object]]):
     """
     Generator for a list of values.
     """
 
     config = GeneratorConfig(1, True, False)
 
-    def __call__(self) -> List[Any]:
+    def __call__(self) -> List[object]:
         return list(super().__call__())
 
     def __str__(self) -> str:
         return f'List[{self._sub_generator}]'
 
 
-class SetGenerator(IterableGenerator):
+class SetGenerator(IterableGenerator, Generator[Set[object]]):
     """
     Generator for a set of values.
     """
 
     config = GeneratorConfig(1, True, False)
 
-    def __call__(self) -> Set[Any]:
+    def __call__(self) -> Set[object]:
         return set(super().__call__())
 
     def __str__(self) -> str:
         return f'Set[{self._sub_generator}]'
 
 
-class TupleEllipsisGenerator(IterableGenerator):
+class TupleEllipsisGenerator(IterableGenerator, Generator[Tuple[object, ...]]):
     """
     Generator for a tuple of values with ellipsis.
     """
 
     config = GeneratorConfig(1, True, True)
 
-    def __call__(self) -> Tuple[Any]:
+    def __call__(self) -> Tuple[object, ...]:
         return tuple(super().__call__())
 
     def __str__(self) -> str:
         return f'Tuple[{str(self._sub_generator)}, ...]'
 
 
-class RangeGenerator(Generator):
+class RangeGenerator(Generator[range]):
     """
     Generator for ranges.
     """
@@ -341,7 +339,7 @@ class RangeGenerator(Generator):
         return 'range'
 
 
-class OptionalGenerator(Generator):
+class OptionalGenerator(Generator[Optional[object]]):
     """
     Generator for optional values.
     """
@@ -359,14 +357,14 @@ class OptionalGenerator(Generator):
         self._null_chance = null_chance
         self._sub_generator = sub_generator
 
-    def __call__(self) -> Optional[Any]:
+    def __call__(self) -> Optional[object]:
         return None if random.random() < self._null_chance else self._sub_generator()
 
     def __str__(self) -> str:
         return f'Optional[{self._sub_generator}]'
 
 
-class DictGenerator(Generator):
+class DictGenerator(Generator[Dict[object, object]]):
     """
     Generator for a dictionary of values.
     """
@@ -389,7 +387,7 @@ class DictGenerator(Generator):
         self._min_length = min_length
         self._max_length = max_length
 
-    def __call__(self) -> Dict[Any, Any]:
+    def __call__(self) -> Dict[object, object]:
         return {self._keys_generator(): self._values_generator() for _ in
                 range(random.randint(self._min_length, self._max_length))}
 
@@ -397,7 +395,7 @@ class DictGenerator(Generator):
         return f'Dict[{self._keys_generator}, {self._values_generator}]'
 
 
-class TupleGenerator(Generator):
+class TupleGenerator(Generator[Tuple[object, ...]]):
     """
     Generator for a tuple of values of different types.
     """
@@ -413,14 +411,14 @@ class TupleGenerator(Generator):
         """
         self._sub_generators = sub_generators
 
-    def __call__(self) -> Tuple:
+    def __call__(self) -> Tuple[object, ...]:
         return tuple(generator() for generator in self._sub_generators)
 
     def __str__(self) -> str:
         return f'Tuple[{", ".join(map(str, self._sub_generators))}]'
 
 
-class TransformGenerator(Generator):
+class TransformGenerator(Generator[object]):
     """
     Generator for running a transformation.
     """
@@ -438,7 +436,7 @@ class TransformGenerator(Generator):
         self._sub_generator = sub_generator
         self._transformer = transformer
 
-    def __call__(self) -> Any:
+    def __call__(self) -> object:
         return self._transformer(self._sub_generator())
 
     def __str__(self) -> str:
