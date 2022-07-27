@@ -1,6 +1,7 @@
 import collections.abc
 import inspect
 import typing
+from dataclasses import dataclass, field
 from functools import partial
 from inspect import signature
 
@@ -9,6 +10,20 @@ from guess_testing.generators import AnyGenerator, BoolGenerator, BytesGenerator
     FloatGenerator, IntGenerator, IterableGenerator, ListGenerator, LiteralGenerator, NoneGenerator, \
     OptionalGenerator, RangeGenerator, SetGenerator, StringGenerator, TupleEllipsisGenerator, TupleGenerator, \
     UnionGenerator
+
+
+@dataclass(frozen=True)
+class ParametersGenerators:
+    """
+    The generators for each type of function parameter.
+    """
+
+    positional: typing.Sequence[Generator] = ()
+    var_positional: IterableGenerator = \
+        field(default_factory=partial(IterableGenerator, NoneGenerator(), min_length=0, max_length=0))
+    keyword: typing.Mapping[str, Generator] = field(default_factory=dict)
+    var_keyword: DictGenerator = \
+        field(default_factory=partial(DictGenerator, NoneGenerator(), NoneGenerator(), min_length=0, max_length=0))
 
 
 class TypingGeneratorFactory:
@@ -129,7 +144,7 @@ class TypingGeneratorFactory:
         raise ValueError(f'Could not interpret type "{annotation}".')
 
     @staticmethod
-    def get_generators(func: typing.Callable) -> typing.Dict[str, Generator]:
+    def get_generators(func: typing.Callable) -> ParametersGenerators:
         """
         Get generators for a function by its type annotations.
 
@@ -139,6 +154,22 @@ class TypingGeneratorFactory:
         Returns:
             The generators matching the function's type annotations.
         """
-        params = signature(func).parameters
-        # todo: maybe check also .kind of the parameter, like POSITIONAL_OR_KEYWORD.
-        return {name: TypingGeneratorFactory.get_generator(type_.annotation) for name, type_ in params.items()}
+        positional = []
+        var_positional = None
+        keyword = {}
+        var_keyword = None
+
+        for name, param in signature(func).parameters.items():
+            if param.kind == inspect._ParameterKind.POSITIONAL_ONLY:
+                positional.append(TypingGeneratorFactory.get_generator(param.annotation))
+            elif param.kind == inspect._ParameterKind.VAR_POSITIONAL:
+                var_positional = TypingGeneratorFactory.get_generator(typing.Iterable[param.annotation])
+            elif param.kind in (inspect._ParameterKind.POSITIONAL_OR_KEYWORD, inspect._ParameterKind.KEYWORD_ONLY):
+                keyword[name] = TypingGeneratorFactory.get_generator(param.annotation)
+            else:
+                var_keyword = TypingGeneratorFactory.get_generator(typing.Dict[str, param.annotation])
+
+        return ParametersGenerators(positional=positional,
+                                    keyword=keyword,
+                                    **dict(var_positional=var_positional) if var_positional else {},
+                                    **dict(var_keyword=var_keyword) if var_keyword else {})

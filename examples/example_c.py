@@ -6,7 +6,7 @@ def c():
 
 
 guesser = Guesser((c,))
-guesser.guess(pretty=True)
+guesser.guess(pretty=True, suppress_exceptions=ZeroDivisionError)
 print(guesser.coverage)
 print(guesser.exceptions)
 print(guesser.return_values)
