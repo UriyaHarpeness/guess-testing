@@ -22,6 +22,8 @@ class Generator(Generic[_T], metaclass=abc.ABCMeta):
     Base class for the generators.
     """
 
+    __slots__ = ()
+
     @property
     @abc.abstractmethod
     def config(self) -> GeneratorConfig:

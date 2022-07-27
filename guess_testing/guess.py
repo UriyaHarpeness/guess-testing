@@ -5,13 +5,13 @@ import copy
 import datetime
 import logging
 from collections import defaultdict
-from typing import Callable, Dict, Optional, Sequence, Set, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Sized, Tuple, Type, Union
 
 from guess_testing.tracing import Tracer
 from guess_testing.typing_generators_factory import ParametersGenerators, TypingGeneratorFactory
 
-# A definition for a type that describes files and their line numbers.
-Lines = Dict[str, Set[int]]
+# A definition for a type that describes files and their line numbers (and optionally opcodes offsets).
+Lines = Union[Set[int], Set[Tuple[int, Tuple[int, int]]]]
 
 
 class StopConditions:
@@ -38,6 +38,8 @@ class Guesser:
 
     logger = logging.getLogger('guess-testing')
 
+    __slots__ = '__tracer', '__parameters_generators', '__run_arguments', '__runs_with_results'
+
     def __init__(self, funcs: Union[Sequence[Callable], Callable], trace_opcodes: bool = False,
                  parameters_generators: Optional[ParametersGenerators] = None):
         """
@@ -54,13 +56,14 @@ class Guesser:
         if parameters_generators is None:
             parameters_generators = TypingGeneratorFactory.get_generators(self.__tracer.funcs[0])
         self.__parameters_generators = parameters_generators
-        self.__run_arguments = []
+        self.__run_arguments: List[Tuple[Iterable[object], Mapping[str, object]]] = []
+        self.__runs_with_results: Dict[int, Tuple[Dict[str, Lines], object]] = {}
 
     @staticmethod
-    def reduce_lines(to_reduce: Lines, reduce_by: Lines):
+    def reduce_lines(to_reduce: Dict[Any, Set[Any]], reduce_by: Dict[Any, Set[Any]]):
         """
         Reduce a lines structure.
-        Removes all the values existing in lines b from lines a.
+        Removes all the values existing in lines reduce_by from lines to_reduce.
 
         Args:
             to_reduce: The lines to reduce.
@@ -72,10 +75,10 @@ class Guesser:
                 to_reduce.pop(k)
 
     @staticmethod
-    def equalize_lines(to_equalize: Lines, equalize_by: Lines):
+    def equalize_lines(to_equalize: Dict[Any, Set[Any]], equalize_by: Dict[Any, Set[Any]]):
         """
         Equalize a lines structure.
-        Removes all the values that do not exist in lines b from lines a.
+        Removes all the values that do not exist in lines equalize_by from lines to_equalize.
 
         Args:
             to_equalize: The lines to equalize.
@@ -90,7 +93,7 @@ class Guesser:
                 to_equalize.pop(k)
 
     @staticmethod
-    def lines_length(lines: Lines) -> int:
+    def lines_length(lines: Dict[Any, Sized]) -> int:
         """
         Get the length of a lines structure.
 
@@ -102,8 +105,8 @@ class Guesser:
         """
         return sum(len(line) for line in lines.values())
 
-    def check_stop_conditions(self, stop_conditions: int, call_count: int, call_limit: int, execution_time: float,
-                              timeout: float, missed_lines: Dict[str, Set[int]]) -> bool:
+    def check_stop_conditions(self, stop_conditions: int, call_count: int, call_limit: Union[float, int],
+                              execution_time: float, timeout: float, missed_lines: Dict[str, Set[int]]) -> bool:
         """
         Check if any stop condition is met.
 
@@ -125,7 +128,7 @@ class Guesser:
             self.logger.debug('Reached seconds limit: %d, breaking.', timeout)
             return True
         if stop_conditions & StopConditions.EXCEPTION_RAISED and 0 < call_count <= len(
-                self.__tracer.runs) and isinstance(self.__tracer.runs[call_count - 1][1], Exception):
+                self.__runs_with_results) and isinstance(self.__runs_with_results[call_count - 1][1], Exception):
             self.logger.debug('Exception was thrown, breaking.')
             return True
         if stop_conditions & StopConditions.FULL_COVERAGE and len(missed_lines) == 0:
@@ -136,7 +139,7 @@ class Guesser:
 
     def guess(self,
               stop_conditions: int = StopConditions.FULL_COVERAGE | StopConditions.TIMEOUT | StopConditions.CALL_LIMIT,
-              call_limit: int = float('inf'), timeout: float = 10,
+              call_limit: Union[float, int] = float('inf'), timeout: float = 10,
               suppress_exceptions: Union[Sequence[Type[Exception]], Type[Exception]] = (),
               pretty: bool = False) -> Guesser:
         """
@@ -185,10 +188,10 @@ class Guesser:
                 except suppress_exceptions as exception:
                     result = exception
 
-                self.__tracer.runs[call_count] = (self.__tracer.runs[call_count], result)
+                self.__runs_with_results[call_count] = (self.__tracer.runs[call_count], result)
 
                 # Update coverage.
-                Guesser.reduce_lines(missed_lines, self.__tracer.runs[call_count][0])
+                Guesser.reduce_lines(missed_lines, self.__runs_with_results[call_count][0])
                 call_count += 1
 
                 missed_lines_count = self.lines_length(missed_lines)
@@ -209,7 +212,7 @@ class Guesser:
         cases = set()
 
         scope = copy.deepcopy(self.__tracer.scope)
-        subsets = {run_id: copy.deepcopy(run_scope[0]) for run_id, run_scope in self.__tracer.runs.items()}
+        subsets = {run_id: copy.deepcopy(run_scope[0]) for run_id, run_scope in self.__runs_with_results.items()}
         while scope:
             for subset in subsets.values():
                 self.equalize_lines(subset, scope)
@@ -240,7 +243,7 @@ class Guesser:
         Returns:
             Information summary related to coverage.
         """
-        if self.__tracer.runs is None:
+        if not self.__runs_with_results:
             return None
 
         cases, missed = self.get_best_cover()
@@ -285,10 +288,10 @@ class Guesser:
         Returns:
             Information summary related to exceptions.
         """
-        if self.__tracer.runs is None:
+        if not self.__runs_with_results:
             return None
 
-        exception_runs = {run_id: results for run_id, results in self.__tracer.runs.items() if
+        exception_runs = {run_id: results for run_id, results in self.__runs_with_results.items() if
                           isinstance(results[1], Exception)}
 
         by_type = {}
@@ -298,14 +301,14 @@ class Guesser:
         for run_id, exception_run in exception_runs.items():
             location = self.get_exception_location(exception_run[1])
             if type(exception_run[1]) not in by_type:
-                by_type[type(exception_run[1])] = (self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                by_type[type(exception_run[1])] = (self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
             if location not in by_location:
-                by_location[location] = (self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                by_location[location] = (self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
                 if location is not None:
                     locations[location[0]].add(location[1])
             if (location, type(exception_run[1])) not in by_location_and_type:
                 by_location_and_type[(location, type(exception_run[1]))] = (
-                    self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                    self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
 
         return dict(locations=dict(locations),
                     by_location=by_location,
@@ -321,11 +324,11 @@ class Guesser:
         Returns:
             Information summary related to return values.
         """
-        if self.__tracer.runs is None:
+        if not self.__runs_with_results:
             return None
 
         # Note: a function that returns an exception, will be considered like it has thrown the exception.
-        return_runs = {run_id: results for run_id, results in self.__tracer.runs.items() if
+        return_runs = {run_id: results for run_id, results in self.__runs_with_results.items() if
                        not isinstance(results[1], Exception)}
 
         by_type = {}
@@ -333,12 +336,12 @@ class Guesser:
         by_type_and_value = {}
         for run_id, return_run in return_runs.items():
             if type(return_run[1]) not in by_type:
-                by_type[type(return_run[1])] = (self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                by_type[type(return_run[1])] = (self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
             if return_run[1] not in by_value:
-                by_value[return_run[1]] = (self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                by_value[return_run[1]] = (self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
             if (type(return_run[1]), return_run[1]) not in by_type_and_value:
                 by_type_and_value[(type(return_run[1]), return_run[1])] = (
-                    self.__run_arguments[run_id], self.__tracer.runs[run_id][1])
+                    self.__run_arguments[run_id], self.__runs_with_results[run_id][1])
 
         return dict(values=set(by_value.keys()),
                     by_value=by_value,
