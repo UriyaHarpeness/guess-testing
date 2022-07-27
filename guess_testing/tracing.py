@@ -25,7 +25,7 @@ class Tracer:
             path, lines, opcode_offsets = self.get_func_scope(func)
             self.scope[path].update(opcode_offsets if self.trace_opcodes else lines)
         self.original_trace = None
-        self.runs = None
+        self.runs = {}
         self.run_id = None
 
     @staticmethod

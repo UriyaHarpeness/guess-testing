@@ -1,19 +1,23 @@
 import abc
 from dataclasses import dataclass
-from typing import Any
+from typing import Generic, TypeVar
 
 
-@dataclass
+@dataclass(frozen=True)
 class GeneratorConfig:
     """
     Configuration describing each generator.
     """
+
     sub_generators_number: int  # The number of sub generators the generator requires.
     requires_only_generators: bool  # Does the generator require only generators for initialization.
     immutable: bool  # Is the generator's result immutable.
 
 
-class Generator(abc.ABC):
+_T = TypeVar('_T')
+
+
+class Generator(Generic[_T], metaclass=abc.ABCMeta):
     """
     Base class for the generators.
     """
@@ -27,7 +31,7 @@ class Generator(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def __call__(self) -> Any:
+    def __call__(self) -> _T:
         """
         Generate a value.
         """
