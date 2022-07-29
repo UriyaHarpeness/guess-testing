@@ -1,4 +1,4 @@
-![Guess Testing](logo.svg)
+![Guess Testing](https://github.com/UriyaHarpeness/guess-testing/blob/master/logo.svg)
 
 # Guess Testing
 
@@ -180,7 +180,7 @@ ParametersGenerators(positional=[], var_positional=Iterable[None], keyword={'a':
 [28287, -14622, 63845, 34029, 4292, -45424, -55058, -50316, 21225]
 ```
 
-Here's another one, a bit more extreme ([Example G](examples/example_g.py)):
+Here's another one, a bit more extreme ([Example G](https://github.com/UriyaHarpeness/guess-testing/blob/master/example-run.gif)):
 
 ```python
 from guess_testing.generators import AnyGenerator

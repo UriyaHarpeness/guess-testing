@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import abc
+import inspect
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, Iterable, List, TypeVar
 
 
 @dataclass(frozen=True)
@@ -32,6 +35,14 @@ class Generator(Generic[_T], metaclass=abc.ABCMeta):
         """
         raise NotImplementedError
 
+    @classmethod
+    def get_inheritances(cls) -> List[Generator]:
+        return [generator for generator in cls.__subclasses__() if not inspect.isabstract(generator)]
+
+    # @abc.abstractmethod
+    # def matches_requirements(self, requirements: Iterable[object]) -> bool:
+    #     pass
+
     @abc.abstractmethod
     def __call__(self) -> _T:
         """
@@ -49,3 +60,20 @@ class Generator(Generic[_T], metaclass=abc.ABCMeta):
         """
         String representation of the generator.
         """
+
+
+class ConcreteGenerator(Generic[_T], Generator[_T], metaclass=abc.ABCMeta):
+    """
+    Base class for the generators.
+    """
+
+    __slots__ = ()
+
+    @property
+    @abc.abstractmethod
+    def generated_type(self) -> object:
+        raise NotImplementedError
+
+    # @abc.abstractmethod
+    # def matches_requirements(self, requirements: Iterable[object]) -> bool:
+    #     pass

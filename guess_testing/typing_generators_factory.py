@@ -7,9 +7,9 @@ from inspect import signature
 
 from guess_testing._base_generator import Generator
 from guess_testing.generators import AnyGenerator, BoolGenerator, BytesGenerator, ComplexGenerator, DictGenerator, \
-    FloatGenerator, IntGenerator, IterableGenerator, ListGenerator, LiteralGenerator, NoneGenerator, \
-    OptionalGenerator, RangeGenerator, SetGenerator, StringGenerator, TupleEllipsisGenerator, TupleGenerator, \
-    UnionGenerator
+    FloatGenerator, FrozenSetGenerator, IntGenerator, IterableGenerator, ListGenerator, LiteralGenerator, \
+    NoneGenerator, NoneType, OptionalGenerator, RangeGenerator, SetGenerator, StringGenerator, TupleEllipsisGenerator, \
+    TupleGenerator, UnionGenerator
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,7 @@ class TypingGeneratorFactory:
         bytes: partial(BytesGenerator),
         range: partial(RangeGenerator),
         None: partial(NoneGenerator),
-        type(None): partial(NoneGenerator),
+        NoneType: partial(NoneGenerator),
 
         typing.Iterable: lambda: IterableGenerator(AnyGenerator()),
         collections.abc.Iterable: lambda: IterableGenerator(AnyGenerator()),
@@ -57,6 +57,9 @@ class TypingGeneratorFactory:
         set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
         typing.Set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
         collections.abc.Set: lambda: SetGenerator(AnyGenerator(require_hashable=True)),
+
+        frozenset: lambda: FrozenSetGenerator(AnyGenerator(require_hashable=True)),
+        typing.FrozenSet: lambda: FrozenSetGenerator(AnyGenerator(require_hashable=True)),
 
         tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
         typing.Tuple: lambda: TupleEllipsisGenerator(AnyGenerator()),
@@ -80,6 +83,8 @@ class TypingGeneratorFactory:
         set: SetGenerator,
         typing.Set: SetGenerator,
         collections.abc.Set: SetGenerator,
+        frozenset: FrozenSetGenerator,
+        typing.FrozenSet: FrozenSetGenerator,
         tuple: TupleGenerator,
         typing.Tuple: TupleGenerator,
         object: AnyGenerator,
@@ -108,7 +113,7 @@ class TypingGeneratorFactory:
             return TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR[annotation]()
 
         if annotation.__module__ == 'typing':
-            origin, args = annotation.__origin__, annotation.__args__
+            origin, args = typing.get_origin(annotation), typing.get_args(annotation)
             if origin in TypingGeneratorFactory.CONTINUOUS_ANNOTATION_TO_GENERATOR:
                 if not args:
                     return TypingGeneratorFactory.FINAL_ANNOTATION_TO_GENERATOR[annotation]()
@@ -127,9 +132,10 @@ class TypingGeneratorFactory:
 
                 # Handle Optional written as Union[TYPE, NoneType].
                 elif origin is typing.Union:
-                    if len(args) == 2 and args[1] is type(None):
-                        matching_generator = OptionalGenerator
-                        args = args[:1]
+                    if None in args or NoneType in args:
+                        return OptionalGenerator(
+                            UnionGenerator([TypingGeneratorFactory.get_generator(arg) for arg in args if
+                                            arg not in {None, NoneType}]))
 
                 # Handle Literal written as Literal[VALUE].
                 elif origin is typing.Literal:

@@ -1,7 +1,10 @@
 import random
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Type, cast
+import string
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union, cast
 
 from guess_testing._base_generator import Generator, GeneratorConfig
+
+NoneType = type(None)
 
 
 class IntGenerator(Generator[int]):
@@ -9,6 +12,7 @@ class IntGenerator(Generator[int]):
     Generator for integer values.
     """
 
+    generated_type = int
     config = GeneratorConfig(0, True, True)
 
     __slots__ = '_start', '_stop', '_step'
@@ -38,11 +42,16 @@ class FloatGenerator(Generator[float]):
     Generator for float values.
     """
 
+    generated_type = float
     config = GeneratorConfig(0, True, True)
 
-    __slots__ = '_start', '_stop', '_step'
+    # Float's special cases.
+    SPECIAL_CASES = (float('inf'), float('-inf'), float('nan'))
 
-    def __init__(self, start: float = -2 ** 16, stop: float = 2 ** 16, step: Optional[float] = None):
+    __slots__ = '_start', '_stop', '_step', '_special_cases_chance'
+
+    def __init__(self, start: float = -2 ** 16, stop: float = 2 ** 16, step: Optional[float] = None,
+                 special_cases_chance: float = 1 / 2 ** 8):
         """
         Constructor.
 
@@ -50,12 +59,17 @@ class FloatGenerator(Generator[float]):
             start: Minimum value (including).
             stop: Maximum value (excluding).
             step: The jumps between the possible values from the minimum value until the maximum value.
+            special_cases_chance: The change of generating one of float's special cases, a float between 0 and 1.
         """
         self._start = start
         self._stop = stop
         self._step = step
+        self._special_cases_chance = special_cases_chance
 
     def __call__(self) -> float:
+        if random.random() < self._special_cases_chance:
+            return random.choice(self.SPECIAL_CASES)
+
         if not self._step:
             return random.uniform(self._start, self._stop)
         return random.randrange(int(self._start / self._step), int(self._stop / self._step)) * self._step
@@ -69,13 +83,15 @@ class ComplexGenerator(Generator[complex]):
     Generator for complex values.
     """
 
+    generated_type = complex
     config = GeneratorConfig(0, True, True)
 
     __slots__ = '_real_generator', '_imaginary_generator'
 
     def __init__(self, real_start: float = -2 ** 16, real_stop: float = 2 ** 16, real_step: Optional[float] = None,
-                 imaginary_start: float = -2 ** 16, imaginary_stop: float = 2 ** 16,
-                 imaginary_step: Optional[float] = None):
+                 real_special_cases_chance: float = 1 / 2 ** 8, imaginary_start: float = -2 ** 16,
+                 imaginary_stop: float = 2 ** 16, imaginary_step: Optional[float] = None,
+                 imaginary_special_cases_chance: float = 1 / 2 ** 8):
         """
         Constructor.
 
@@ -89,8 +105,9 @@ class ComplexGenerator(Generator[complex]):
             imaginary_step: The jumps between the possible values from the minimum value until the maximum value for the
                 imaginary part.
         """
-        self._real_generator = FloatGenerator(real_start, real_stop, real_step)
-        self._imaginary_generator = FloatGenerator(imaginary_start, imaginary_stop, imaginary_step)
+        self._real_generator = FloatGenerator(real_start, real_stop, real_step, real_special_cases_chance)
+        self._imaginary_generator = FloatGenerator(imaginary_start, imaginary_stop, imaginary_step,
+                                                   imaginary_special_cases_chance)
 
     def __call__(self) -> complex:
         return complex(self._real_generator(), self._imaginary_generator())
@@ -104,6 +121,7 @@ class BoolGenerator(Generator[bool]):
     Generator for boolean values.
     """
 
+    generated_type = bool
     config = GeneratorConfig(0, True, True)
 
     __slots__ = ()
@@ -120,19 +138,12 @@ class StringGenerator(Generator[str]):
     Generator for string values.
     """
 
+    generated_type = str
     config = GeneratorConfig(0, True, True)
-
-    # A collection of possible character batches to use.
-    UPPERCASE = ''.join(chr(x) for x in range(ord('A'), ord('Z') + 1))
-    LOWERCASE = ''.join(chr(x) for x in range(ord('a'), ord('z') + 1))
-    NUMBERS = ''.join(chr(x) for x in range(ord('0'), ord('9') + 1))
-    READABLE_OTHER = '!@#$%^&*()-=_+{}[]\\|/<>\'"`~;.,\n\t '
-    ALL = ''.join(chr(x) for x in range(256))
-    READABLE = UPPERCASE + LOWERCASE + NUMBERS + READABLE_OTHER
 
     __slots__ = '_min_length', '_max_length', '_selection'
 
-    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = READABLE):
+    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = string.printable):
         """
         Constructor.
 
@@ -158,11 +169,12 @@ class BytesGenerator(StringGenerator, Generator[bytes]):
     Generator for bytes values.
     """
 
+    generated_type = bytes
     config = GeneratorConfig(0, True, True)
 
     __slots__ = ('_encoding',)
 
-    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = StringGenerator.READABLE,
+    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = string.printable,
                  encoding: str = 'utf-8'):
         """
         Constructor.
@@ -183,11 +195,70 @@ class BytesGenerator(StringGenerator, Generator[bytes]):
         return 'bytes'
 
 
+class ByteArrayGenerator(BytesGenerator, Generator[bytearray]):
+    """
+    Generator for bytearray values.
+    """
+
+    generated_type = bytearray
+    config = GeneratorConfig(0, True, False)
+
+    __slots__ = ()
+
+    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = string.printable,
+                 encoding: str = 'utf-8'):
+        """
+        Constructor.
+
+        Args:
+            min_length: Minimum length (including).
+            max_length: Maximum value (including).
+            selection: A string to choose characters from.
+            encoding: The encoding to use.
+        """
+        super().__init__(min_length, max_length, selection, encoding)
+
+    def __call__(self) -> bytearray:
+        return bytearray(super().__call__())
+
+    def __str__(self) -> str:
+        return 'bytearray'
+
+
+class MemoryViewGenerator(BytesGenerator, Generator[memoryview]):
+    """
+    Generator for memoryview values.
+    """
+
+    generated_type = memoryview
+    config = GeneratorConfig(0, True, True)
+
+    def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = string.printable,
+                 encoding: str = 'utf-8'):
+        """
+        Constructor.
+
+        Args:
+            min_length: Minimum length (including).
+            max_length: Maximum value (including).
+            selection: A string to choose characters from.
+            encoding: The encoding to use.
+        """
+        super().__init__(min_length, max_length, selection, encoding)
+
+    def __call__(self) -> memoryview:
+        return memoryview(super().__call__())
+
+    def __str__(self) -> str:
+        return 'memoryview'
+
+
 class LiteralGenerator(Generator[object]):
     """
     Generator for a literal value.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(-1, False, True)
 
     __slots__ = ('_literal_values',)
@@ -213,6 +284,7 @@ class NoneGenerator(Generator[None]):
     Generator for a None value.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(0, True, True)
 
     __slots__ = ()
@@ -234,6 +306,7 @@ class UnionGenerator(Generator[object]):
     Generator for a union of generators.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(-1, True, True)
 
     __slots__ = ('_sub_generators',)
@@ -259,6 +332,7 @@ class IterableGenerator(Generator[Iterable[object]]):
     Generator for iterable values.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(1, True, False)
 
     __slots__ = '_sub_generator', '_min_length', '_max_length'
@@ -288,6 +362,7 @@ class ListGenerator(IterableGenerator, Generator[List[object]]):
     Generator for a list of values.
     """
 
+    generated_type = list
     config = GeneratorConfig(1, True, False)
 
     __slots__ = ()
@@ -304,6 +379,7 @@ class SetGenerator(IterableGenerator, Generator[Set[object]]):
     Generator for a set of values.
     """
 
+    generated_type = set
     config = GeneratorConfig(1, True, False)
 
     __slots__ = ()
@@ -315,11 +391,29 @@ class SetGenerator(IterableGenerator, Generator[Set[object]]):
         return f'Set[{self._sub_generator}]'
 
 
+class FrozenSetGenerator(IterableGenerator, Generator[FrozenSet[object]]):
+    """
+    Generator for a frozenset of values.
+    """
+
+    generated_type = frozenset
+    config = GeneratorConfig(1, True, True)
+
+    __slots__ = ()
+
+    def __call__(self) -> FrozenSet[object]:
+        return frozenset(super().__call__())
+
+    def __str__(self) -> str:
+        return f'FrozenSet[{self._sub_generator}]'
+
+
 class TupleEllipsisGenerator(IterableGenerator, Generator[Tuple[object, ...]]):
     """
     Generator for a tuple of values with ellipsis.
     """
 
+    generated_type = tuple
     config = GeneratorConfig(1, True, True)
 
     __slots__ = ()
@@ -336,6 +430,7 @@ class RangeGenerator(Generator[range]):
     Generator for ranges.
     """
 
+    generated_type = range
     config = GeneratorConfig(0, True, True)
 
     __slots__ = '_minimum', '_maximum', '_min_step', '_max_step'
@@ -372,6 +467,7 @@ class OptionalGenerator(Generator[Optional[object]]):
     Generator for optional values.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(1, True, True)
 
     __slots__ = '_null_chance', '_sub_generator'
@@ -399,6 +495,7 @@ class DictGenerator(Generator[Dict[object, object]]):
     Generator for a dictionary of values.
     """
 
+    generated_type = dict
     config = GeneratorConfig(2, True, False)
 
     __slots__ = '_keys_generator', '_values_generator', '_min_length', '_max_length'
@@ -432,6 +529,7 @@ class TupleGenerator(Generator[Tuple[object, ...]]):
     Generator for a tuple of values of different types.
     """
 
+    generated_type = tuple
     config = GeneratorConfig(-1, True, True)
 
     __slots__ = ('_sub_generators',)
@@ -457,6 +555,7 @@ class TransformGenerator(Generator[object]):
     Generator for running a transformation.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(1, False, False)
 
     __slots__ = '_sub_generator', '_transformer'
@@ -479,6 +578,8 @@ class TransformGenerator(Generator[object]):
         return f'Transform[{self._sub_generator}, {self._transformer}]'
 
 
+# todo: add with fixture. maybe not only here.
+
 # All the available generators.
 GENERATORS = {
     BoolGenerator,
@@ -487,11 +588,14 @@ GENERATORS = {
     ComplexGenerator,
     StringGenerator,
     BytesGenerator,
+    ByteArrayGenerator,
+    MemoryViewGenerator,
     RangeGenerator,
     NoneGenerator,
     IterableGenerator,
     ListGenerator,
     TupleEllipsisGenerator,
+    FrozenSetGenerator,
     SetGenerator,
     OptionalGenerator,
     DictGenerator,
@@ -507,6 +611,7 @@ class AnyGenerator(Generator):
     Generator for every possible value.
     """
 
+    generated_type = NoneType
     config = GeneratorConfig(-1, True, True)
 
     def __init__(self, sub_generators: Sequence[Generator] = None, max_depth: int = 5, require_hashable: bool = False):
@@ -545,9 +650,10 @@ class AnyGenerator(Generator):
 
         chosen_generator = random.choice(generator_options)
 
-        if chosen_generator == SetGenerator:
-            return cast(Type[SetGenerator], chosen_generator)(
+        if chosen_generator in (SetGenerator, FrozenSetGenerator):
+            return cast(Type[Union[SetGenerator, FrozenSetGenerator]], chosen_generator)(
                 AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True))
+
         if chosen_generator == DictGenerator:
             return cast(Type[DictGenerator], chosen_generator)(
                 AnyGenerator.generate_generator(given_generator_options, max_depth - 1, True),
