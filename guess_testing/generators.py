@@ -1,13 +1,18 @@
+import collections.abc
 import random
 import string
-from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union, cast
+import typing
+from types import GeneratorType
+from typing import Any, Callable, Dict, FrozenSet, Iterable, List, Optional, Sequence, Set, Tuple, Type, Union, cast, \
+    get_args, get_origin, Hashable
 
-from guess_testing._base_generator import Generator, GeneratorConfig
+from guess_testing._base_generator import ConcreteGenerator, Generator, GeneratorConfig, RequiresSpecification, \
+    FinalConcreteGenerator
 
-NoneType = type(None)
+NoneType = type(None)  # Appears as part of `types` module at later python versions.
 
 
-class IntGenerator(Generator[int]):
+class IntGenerator(FinalConcreteGenerator[int]):
     """
     Generator for integer values.
     """
@@ -33,11 +38,8 @@ class IntGenerator(Generator[int]):
     def __call__(self) -> int:
         return random.randrange(self._start, self._stop, self._step)
 
-    def __str__(self) -> str:
-        return 'int'
 
-
-class FloatGenerator(Generator[float]):
+class FloatGenerator(FinalConcreteGenerator[float]):
     """
     Generator for float values.
     """
@@ -59,7 +61,7 @@ class FloatGenerator(Generator[float]):
             start: Minimum value (including).
             stop: Maximum value (excluding).
             step: The jumps between the possible values from the minimum value until the maximum value.
-            special_cases_chance: The change of generating one of float's special cases, a float between 0 and 1.
+            special_cases_chance: The chance of generating one of float's special cases, a float between 0 and 1.
         """
         self._start = start
         self._stop = stop
@@ -74,11 +76,8 @@ class FloatGenerator(Generator[float]):
             return random.uniform(self._start, self._stop)
         return random.randrange(int(self._start / self._step), int(self._stop / self._step)) * self._step
 
-    def __str__(self) -> str:
-        return 'float'
 
-
-class ComplexGenerator(Generator[complex]):
+class ComplexGenerator(FinalConcreteGenerator[complex]):
     """
     Generator for complex values.
     """
@@ -112,11 +111,8 @@ class ComplexGenerator(Generator[complex]):
     def __call__(self) -> complex:
         return complex(self._real_generator(), self._imaginary_generator())
 
-    def __str__(self) -> str:
-        return 'complex'
 
-
-class BoolGenerator(Generator[bool]):
+class BoolGenerator(FinalConcreteGenerator[bool]):
     """
     Generator for boolean values.
     """
@@ -129,11 +125,8 @@ class BoolGenerator(Generator[bool]):
     def __call__(self) -> bool:
         return random.choice((True, False))
 
-    def __str__(self) -> str:
-        return 'bool'
 
-
-class StringGenerator(Generator[str]):
+class StringGenerator(FinalConcreteGenerator[str]):
     """
     Generator for string values.
     """
@@ -160,11 +153,8 @@ class StringGenerator(Generator[str]):
         return ''.join(
             random.choice(self._selection) for _ in range(random.randrange(self._min_length, self._max_length + 1)))
 
-    def __str__(self) -> str:
-        return 'str'
 
-
-class BytesGenerator(StringGenerator, Generator[bytes]):
+class BytesGenerator(StringGenerator, FinalConcreteGenerator[bytes]):
     """
     Generator for bytes values.
     """
@@ -191,11 +181,8 @@ class BytesGenerator(StringGenerator, Generator[bytes]):
     def __call__(self) -> bytes:
         return super().__call__().encode(self._encoding)
 
-    def __str__(self) -> str:
-        return 'bytes'
 
-
-class ByteArrayGenerator(BytesGenerator, Generator[bytearray]):
+class ByteArrayGenerator(BytesGenerator, FinalConcreteGenerator[bytearray]):
     """
     Generator for bytearray values.
     """
@@ -221,11 +208,8 @@ class ByteArrayGenerator(BytesGenerator, Generator[bytearray]):
     def __call__(self) -> bytearray:
         return bytearray(super().__call__())
 
-    def __str__(self) -> str:
-        return 'bytearray'
 
-
-class MemoryViewGenerator(BytesGenerator, Generator[memoryview]):
+class MemoryViewGenerator(BytesGenerator, FinalConcreteGenerator[memoryview]):
     """
     Generator for memoryview values.
     """
@@ -233,8 +217,10 @@ class MemoryViewGenerator(BytesGenerator, Generator[memoryview]):
     generated_type = memoryview
     config = GeneratorConfig(0, True, True)
 
+    __slots__ = ('_bytearray_chance',)
+
     def __init__(self, min_length: int = 0, max_length: int = 2 ** 5, selection: str = string.printable,
-                 encoding: str = 'utf-8'):
+                 encoding: str = 'utf-8', bytearray_chance: float = 0.5):
         """
         Constructor.
 
@@ -243,14 +229,24 @@ class MemoryViewGenerator(BytesGenerator, Generator[memoryview]):
             max_length: Maximum value (including).
             selection: A string to choose characters from.
             encoding: The encoding to use.
+            bytearray_chance: The chance of creating the memoryview over bytearray, a float between 0 and 1.
         """
         super().__init__(min_length, max_length, selection, encoding)
+        self._bytearray_chance = bytearray_chance
+
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        if specification in (typing.Hashable, collections.abc.Hashable):
+            return RequiresSpecification((), cls, ((), {'bytearray_chance': 0}))
+
+        return RequiresSpecification((), cls, ((), {}))
 
     def __call__(self) -> memoryview:
-        return memoryview(super().__call__())
-
-    def __str__(self) -> str:
-        return 'memoryview'
+        created = super().__call__()
+        return memoryview(bytearray(created) if random.random() < self._bytearray_chance else created)
 
 
 class LiteralGenerator(Generator[object]):
@@ -279,7 +275,7 @@ class LiteralGenerator(Generator[object]):
         return f'Literal[{", ".join(sorted(set(map(str, self._literal_values))))}]'
 
 
-class NoneGenerator(Generator[None]):
+class NoneGenerator(FinalConcreteGenerator[None]):
     """
     Generator for a None value.
     """
@@ -327,12 +323,12 @@ class UnionGenerator(Generator[object]):
         return f'Union[{", ".join(sorted(set(map(str, self._sub_generators))))}]'
 
 
-class IterableGenerator(Generator[Iterable[object]]):
+class IterableGenerator(ConcreteGenerator[GeneratorType]):
     """
     Generator for iterable values.
     """
 
-    generated_type = NoneType
+    generated_type = GeneratorType
     config = GeneratorConfig(1, True, False)
 
     __slots__ = '_sub_generator', '_min_length', '_max_length'
@@ -350,6 +346,14 @@ class IterableGenerator(Generator[Iterable[object]]):
         self._min_length = min_length
         self._max_length = max_length
 
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        args = get_args(specification)
+        return RequiresSpecification((args[0] if args else object,), cls, ((), {}))
+
     def __call__(self) -> Iterable[object]:
         return (self._sub_generator() for _ in range(random.randint(self._min_length, self._max_length)))
 
@@ -357,7 +361,7 @@ class IterableGenerator(Generator[Iterable[object]]):
         return f'Iterable[{self._sub_generator}]'
 
 
-class ListGenerator(IterableGenerator, Generator[List[object]]):
+class ListGenerator(IterableGenerator, ConcreteGenerator[list]):
     """
     Generator for a list of values.
     """
@@ -374,7 +378,7 @@ class ListGenerator(IterableGenerator, Generator[List[object]]):
         return f'List[{self._sub_generator}]'
 
 
-class SetGenerator(IterableGenerator, Generator[Set[object]]):
+class SetGenerator(IterableGenerator, ConcreteGenerator[set]):
     """
     Generator for a set of values.
     """
@@ -384,6 +388,14 @@ class SetGenerator(IterableGenerator, Generator[Set[object]]):
 
     __slots__ = ()
 
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        args = get_args(specification)
+        return RequiresSpecification((args[0] if args else Hashable,), cls, ((), {}))
+
     def __call__(self) -> Set[object]:
         return set(super().__call__())
 
@@ -391,7 +403,7 @@ class SetGenerator(IterableGenerator, Generator[Set[object]]):
         return f'Set[{self._sub_generator}]'
 
 
-class FrozenSetGenerator(IterableGenerator, Generator[FrozenSet[object]]):
+class FrozenSetGenerator(SetGenerator, ConcreteGenerator[frozenset]):
     """
     Generator for a frozenset of values.
     """
@@ -418,6 +430,20 @@ class TupleEllipsisGenerator(IterableGenerator, Generator[Tuple[object, ...]]):
 
     __slots__ = ()
 
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        if specification in (typing.Hashable, collections.abc.Hashable):
+            return RequiresSpecification((Hashable,), cls, ((), {}))
+
+        args = get_args(specification)
+        if args and (len(args) != 2 or args[1] != Ellipsis):
+            return None
+
+        return RequiresSpecification((args[0] if args else object,), cls, ((), {}))
+
     def __call__(self) -> Tuple[object, ...]:
         return tuple(super().__call__())
 
@@ -425,7 +451,7 @@ class TupleEllipsisGenerator(IterableGenerator, Generator[Tuple[object, ...]]):
         return f'Tuple[{str(self._sub_generator)}, ...]'
 
 
-class RangeGenerator(Generator[range]):
+class RangeGenerator(FinalConcreteGenerator[range]):
     """
     Generator for ranges.
     """
@@ -478,7 +504,7 @@ class OptionalGenerator(Generator[Optional[object]]):
 
         Args:
             sub_generator: The generator to use for generating a value.
-            null_chance: The change of generating a None value, a float between 0 and 1.
+            null_chance: The chance of generating a None value, a float between 0 and 1.
         """
         self._null_chance = null_chance
         self._sub_generator = sub_generator
@@ -490,7 +516,7 @@ class OptionalGenerator(Generator[Optional[object]]):
         return f'Optional[{self._sub_generator}]'
 
 
-class DictGenerator(Generator[Dict[object, object]]):
+class DictGenerator(ConcreteGenerator[dict]):
     """
     Generator for a dictionary of values.
     """
@@ -516,6 +542,17 @@ class DictGenerator(Generator[Dict[object, object]]):
         self._min_length = min_length
         self._max_length = max_length
 
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        args = get_args(specification)
+        if specification == collections.abc.Iterable or get_origin(specification) == collections.abc.Iterable:
+            return RequiresSpecification((args[0] if args else Hashable, object), cls, ((), {}))
+
+        return RequiresSpecification((args[0] if args else Hashable, args[1] if args else object), cls, ((), {}))
+
     def __call__(self) -> Dict[object, object]:
         return {self._keys_generator(): self._values_generator() for _ in
                 range(random.randint(self._min_length, self._max_length))}
@@ -524,7 +561,7 @@ class DictGenerator(Generator[Dict[object, object]]):
         return f'Dict[{self._keys_generator}, {self._values_generator}]'
 
 
-class TupleGenerator(Generator[Tuple[object, ...]]):
+class TupleGenerator(ConcreteGenerator[Tuple[object, ...]]):
     """
     Generator for a tuple of values of different types.
     """
@@ -534,14 +571,36 @@ class TupleGenerator(Generator[Tuple[object, ...]]):
 
     __slots__ = ('_sub_generators',)
 
-    def __init__(self, sub_generators: Sequence[Generator]):
+    def __init__(self, *sub_generators: Union[Sequence[Generator], Generator]):
         """
         Constructor.
 
         Args:
             sub_generators: The generators to use for generating the tuple.
         """
-        self._sub_generators = sub_generators
+        self._sub_generators = []
+        for sub_generator in sub_generators:
+            if isinstance(sub_generator, list):
+                self._sub_generators += sub_generator
+            else:
+                self._sub_generators.append(sub_generator)
+
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification):
+            return None
+
+        if specification in (typing.Hashable, collections.abc.Hashable):
+            return RequiresSpecification(((-1, Hashable),), cls, ((), {}))
+
+        args = get_args(specification)
+        if args and (len(args) == 2 and args[1] == Ellipsis):
+            return None
+
+        if not args:
+            return RequiresSpecification(((-1, object),), cls, ((), {}))
+
+        return RequiresSpecification(args, cls, ((), {}))
 
     def __call__(self) -> Tuple[object, ...]:
         return tuple(generator() for generator in self._sub_generators)

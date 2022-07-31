@@ -95,6 +95,61 @@ class TypingGeneratorFactory:
     }
 
     @staticmethod
+    def new_get_generator(annotation: type, limit: int = 5) -> Generator:
+        # @typing.runtime_checkable
+        # class A(typing.Protocol):
+        #     def real(self): ...
+        #
+        # print([g for g in Generator.get_inheritances() if g.matches_specification(A)])
+        # spec = typing.List[int]
+        # print([g.handle_specification(spec) for g in Generator.get_inheritances() if g.matches_specification(spec)])
+        # spec = typing.List
+        import random
+        generators_ = Generator.get_inheritances()
+        random.shuffle(generators_)
+
+        # todo: maybe shuffle and break on the first match to not have things to the power of options.
+
+        found = None
+        for possible_match in generators_:
+            requirements = possible_match.handle_specification(annotation)
+            if requirements is None or limit == 1 and requirements.to_resolve:
+                continue
+
+            resolved = []
+            matches = True
+
+            for requirement in requirements.to_resolve:
+                if isinstance(requirement, tuple):
+                    amount, type_to_resolve = requirement
+                    amount = random.randint(1, 10) if amount == -1 else amount  # for example.
+                    packed = True
+                else:
+                    amount = 1
+                    type_to_resolve = requirement
+                    packed = False
+
+                matching = [TypingGeneratorFactory.new_get_generator(type_to_resolve, limit - 1) for _ in
+                            range(amount)]
+                if not all(matching):
+                    matches = False
+                    break
+
+                if packed:
+                    resolved.append(matching)
+                else:
+                    resolved += matching
+
+            if not matches:
+                continue
+
+            found = requirements.callback(*resolved, *requirements.callback_arguments[0],
+                                          **requirements.callback_arguments[1])
+            break
+
+        return found
+
+    @staticmethod
     def get_generator(annotation: type) -> Generator:
         """
         Get a generator by annotation.

@@ -3,7 +3,15 @@ from __future__ import annotations
 import abc
 import inspect
 from dataclasses import dataclass
-from typing import Generic, Iterable, List, TypeVar
+from typing import Generic, Iterable, List, TypeVar, get_origin, Optional, Tuple, Mapping, Any, Callable, get_args, \
+    Union
+
+
+@dataclass
+class RequiresSpecification:
+    to_resolve: Tuple[Union[Tuple[int, type], type], ...]
+    callback: Callable
+    callback_arguments: Tuple[Iterable[Any], Mapping[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -37,11 +45,18 @@ class Generator(Generic[_T], metaclass=abc.ABCMeta):
 
     @classmethod
     def get_inheritances(cls) -> List[Generator]:
-        return [generator for generator in cls.__subclasses__() if not inspect.isabstract(generator)]
+        visited = set()
+        to_visit = {cls}
+        while to_visit:
+            next_visit = to_visit.pop()
+            to_visit.update(set(next_visit.__subclasses__()).difference(visited))
+            visited.add(next_visit)
+        return [generator for generator in visited if not inspect.isabstract(generator)]
 
     # @abc.abstractmethod
-    # def matches_requirements(self, requirements: Iterable[object]) -> bool:
-    #     pass
+    @classmethod
+    def handle_specification(cls, specification: type) -> Optional[RequiresSpecification]:
+        return None
 
     @abc.abstractmethod
     def __call__(self) -> _T:
@@ -63,17 +78,35 @@ class Generator(Generic[_T], metaclass=abc.ABCMeta):
 
 
 class ConcreteGenerator(Generic[_T], Generator[_T], metaclass=abc.ABCMeta):
-    """
-    Base class for the generators.
-    """
-
     __slots__ = ()
 
     @property
+    @classmethod
     @abc.abstractmethod
-    def generated_type(self) -> object:
+    def generated_type(cls) -> type:
         raise NotImplementedError
 
-    # @abc.abstractmethod
-    # def matches_requirements(self, requirements: Iterable[object]) -> bool:
-    #     pass
+    @classmethod
+    def matches_specification(cls, specification: type) -> bool:
+        if specification.__module__ == 'typing':
+            origin = get_origin(specification)
+            if origin is not None:
+                try:
+                    return issubclass(cls.generated_type, origin)
+                except TypeError:
+                    return False
+
+        return issubclass(cls.generated_type, specification)
+
+
+class FinalConcreteGenerator(Generic[_T], ConcreteGenerator[_T], metaclass=abc.ABCMeta):
+    __slots__ = ()
+
+    @classmethod
+    def handle_specification(cls, specification: type, /) -> Optional[RequiresSpecification]:
+        if not cls.matches_specification(specification) or get_args(specification):
+            return None
+        return RequiresSpecification((), cls, ((), {}))
+
+    def __str__(self) -> str:
+        return self.generated_type.__name__
