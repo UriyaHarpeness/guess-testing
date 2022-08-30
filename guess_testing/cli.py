@@ -1,6 +1,6 @@
 import typing
 
-import click
+import rich_click as click
 
 from guess_testing.generators import AnyGenerator
 from guess_testing.typing_generators_factory import TypingGeneratorFactory
@@ -24,7 +24,7 @@ def validate_number(_: click.Context, param: click.Option, value: int) -> int:
 @click.option('-n', 'number', default=1, show_default=True, callback=validate_number,
               help='Number of values to generate.')
 def generate_from_string(typing_string: str, number: int):  # pylint: disable=missing-function-docstring
-    generator = TypingGeneratorFactory.get_generator(eval(typing_string, TYPING_TYPES))  # pylint: disable=eval-used
+    generator = TypingGeneratorFactory.new_get_generator(eval(typing_string, TYPING_TYPES))  # pylint: disable=eval-used
     for _ in range(number):
         print(generator())
 
@@ -34,7 +34,7 @@ def generate_from_string(typing_string: str, number: int):  # pylint: disable=mi
               help='Number of types to generate.')
 def generate_type(number: int):  # pylint: disable=missing-function-docstring
     for _ in range(number):
-        print(AnyGenerator.generate_generator())
+        print(TypingGeneratorFactory.new_get_generator(object))
 
 
 @click.group(help='guess-testing CLI.')

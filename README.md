@@ -18,10 +18,13 @@ due to its basic requirements can work on many other versions.
 ### Prerequisites
 
 No additional packages are required for using Guess Testing, but for a pretty progress bar, `rich` is required. For the
-CLI, `click` is required.
+CLI, `rich_click` is required. Or simply install `guess-testing[pretty]`.
 
 ```shell script
-pip install click rich
+pip install guess-testing[pretty]
+
+# Or alternatively:
+pip install rich rich_click
 ```
 
 ### Installing
@@ -111,7 +114,7 @@ print(guesser.return_values)
 
 Now all that's left is running the code, let's see it in action!
 
-![Guess Testing in action](example-run.gif)
+![Guess Testing in action](https://github.com/UriyaHarpeness/guess-testing/blob/master/example-run.gif)
 
 > The code in this example run can be found in [Example E](examples/example_e.py).
 >
@@ -180,7 +183,7 @@ ParametersGenerators(positional=[], var_positional=Iterable[None], keyword={'a':
 [28287, -14622, 63845, 34029, 4292, -45424, -55058, -50316, 21225]
 ```
 
-Here's another one, a bit more extreme ([Example G](https://github.com/UriyaHarpeness/guess-testing/blob/master/example-run.gif)):
+Here's another one, a bit more extreme ([Example G](examples/example_g.py)):
 
 ```python
 from guess_testing.generators import AnyGenerator

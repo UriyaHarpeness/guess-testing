@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from inspect import signature
 
-from guess_testing._base_generator import Generator
+from guess_testing.generators._base_generator import Generator
 from guess_testing.generators import AnyGenerator, BoolGenerator, BytesGenerator, ComplexGenerator, DictGenerator, \
     FloatGenerator, FrozenSetGenerator, IntGenerator, IterableGenerator, ListGenerator, LiteralGenerator, \
     NoneGenerator, NoneType, OptionalGenerator, RangeGenerator, SetGenerator, StringGenerator, TupleEllipsisGenerator, \
@@ -94,16 +94,11 @@ class TypingGeneratorFactory:
         typing.Literal: LiteralGenerator
     }
 
+    MAX_SUB_GENERATORS = 10
+    MIN_SUB_GENERATORS = 1
+
     @staticmethod
     def new_get_generator(annotation: type, limit: int = 5) -> Generator:
-        # @typing.runtime_checkable
-        # class A(typing.Protocol):
-        #     def real(self): ...
-        #
-        # print([g for g in Generator.get_inheritances() if g.matches_specification(A)])
-        # spec = typing.List[int]
-        # print([g.handle_specification(spec) for g in Generator.get_inheritances() if g.matches_specification(spec)])
-        # spec = typing.List
         import random
         generators_ = Generator.get_inheritances()
         random.shuffle(generators_)
@@ -122,7 +117,14 @@ class TypingGeneratorFactory:
             for requirement in requirements.to_resolve:
                 if isinstance(requirement, tuple):
                     amount, type_to_resolve = requirement
-                    amount = random.randint(1, 10) if amount == -1 else amount  # for example.
+                    if callable(amount):
+                        while not TypingGeneratorFactory.MIN_SUB_GENERATORS <= (
+                                generated_amount := amount()) <= TypingGeneratorFactory.MAX_SUB_GENERATORS:
+                            pass
+                        amount = generated_amount
+                    elif amount == -1:
+                        amount = random.randint(TypingGeneratorFactory.MIN_SUB_GENERATORS,
+                                                TypingGeneratorFactory.MAX_SUB_GENERATORS)
                     packed = True
                 else:
                     amount = 1
